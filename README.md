@@ -340,12 +340,3 @@ xcodegen generate --spec project.yml
 ```
 
 （`brew install xcodegen` 即可获得命令；本项目也验证过官方 release 二进制。）
-
----
-
-## 七、后续版本计划（P2，本次未做）
-
-- 日程增删改、iCloud 云同步账号
-- 节日 / 宜忌轻量推送提醒
-- 节气物候动效、生肖运势等趣味模块
-- App Group：让小组件与主 App 共享远程更新的节假日数据
