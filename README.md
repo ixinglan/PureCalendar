@@ -63,7 +63,23 @@ xcrun simctl launch booted com.ixiaoqiang.calendarapp -startDate 2026-10-01  # �
 xcrun simctl launch booted com.ixiaoqiang.calendarapp -showSettings          # 直接打开设置页
 xcrun simctl launch booted com.ixiaoqiang.calendarapp -showWidgetPreview     # 直接打开「组件样式预览」
 xcrun simctl launch booted com.ixiaoqiang.calendarapp -largeFontMode YES     # 开启大字体（走 UserDefaults）
+xcrun simctl launch booted com.ixiaoqiang.calendarapp -showFPSHud YES        # 首页显示实时帧率 HUD
+xcrun simctl launch booted com.ixiaoqiang.calendarapp -scrollProbe           # 自动滚动 10 秒并打印帧统计
+xcrun simctl launch booted com.ixiaoqiang.calendarapp -scrollProbeStatic     # 只统计不自动滚动（手动滑时采样）
 ```
+
+### 跑测试（滚动性能 + 交互回归）
+
+```bash
+xcodebuild test -project CalendarApp.xcodeproj -scheme CalendarApp \
+  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  CODE_SIGNING_ALLOWED=NO
+```
+
+- `testHomeScrollHitchRatio`：用**真实触摸**滑动首页，输出 CPU 与滚动时长指标
+- `testTappingDayUpdatesDetail`：点击日期格子后详情卡片必须切换（守住 `Button → onTapGesture` 的等价性）
+
+> 为什么滚动性能一定要用 UI 测试：程序化滚动（`ScrollViewReader.scrollTo`）不经过手势系统，测不出「自定义手势与 ScrollView 抢手势」这类问题。
 
 ---
 
@@ -99,6 +115,7 @@ xcrun simctl launch booted com.ixiaoqiang.calendarapp -largeFontMode YES     # �
 | **组件样式预览** | 设置页新增「预览组件样式」，在 App 内按**真机点值尺寸**渲染三档组件，免去「先加到主屏才能看效果」的来回折腾 |
 | **中尺寸组件溢出修复** | 迷你月历每格行高固定为「字号 + 7 + 圆点」，6 行约 143pt > 中尺寸可用的 ~126pt，导致月历末行与「宜/忌」被挤出卡片。现为 `MiniMonthGrid` 增加 `cellPadding` / `dotSize` 可调参数，中尺寸改用紧凑参数，内容完整落在卡片内 |
 | **性能：滚动卡顿治理** | 模型层热点优化 + 视图层去重，详见 5.5 |
+| **性能：滚动卡顿二次排查** | 建立「帧探针 + XCUITest 指标」测量手段，结论是滚动已无掉帧；同时修掉 4 个影响交互延迟的真实缺陷，并内置帧率 HUD 供自查。详见 5.6 |
 
 ---
 
@@ -123,11 +140,13 @@ xcrun simctl launch booted com.ixiaoqiang.calendarapp -largeFontMode YES     # �
 │   │   │                            #   WidgetViews（三档 + 锁屏组件视图，主 App 预览也复用）
 │   │   ├── Resources/               # holiday-plans.json（内置节假日基线）
 │   │   └── DesignSystem/            # 配色、卡片样式、字号缩放（Palette / card / scaledFont）
-│   ├── App/                         # 主 App：入口 + 7 个视图
+│   ├── App/                         # 主 App：入口 + 7 个视图 + 诊断工具
+│   │   ├── Diagnostics/             # ScrollDiagnostics（仅 Debug：帧率探针 / 自动滚动 / FPS HUD）
 │   │   └── Views/                   # RootView / MonthGridView / DayDetailView /
 │   │                                #   YearView / HistoryTodayView / SettingsView /
 │   │                                #   WidgetPreviewView（App 内组件样式预览）
 │   └── Widget/                      # WidgetKit 扩展：宿主入口 + 时间线
+├── Tests/UITests/                   # XCUITest：滚动性能指标 + 点击回归
 └── README.md
 ```
 
@@ -210,6 +229,60 @@ xcrun simctl launch booted com.ixiaoqiang.calendarapp -largeFontMode YES     # �
 > 参考基准：60fps 的每帧预算是 **16.7ms**。优化前仅模型层就吃掉 Debug 下近一半预算，再加上视图层的反复测量，滑动自然掉帧；优化后模型层开销已降到预算的约 1%。
 
 **正确性验证**：优化前后分别把 1900-01-31 ~ 2100-12-31 全部日期的农历/干支/节气/生肖字段导出（73,385 行），`diff` 结果**完全一致** —— 是等价优化，不是「改对了大部分」。
+
+### 5.6 第二轮排查：滚动卡顿的量化结论（V1.3）
+
+第二轮反馈「上下滑动还是卡」。这次不再靠推理，而是**先建立测量手段再动手**。
+
+**测量手段一：App 内帧间隔探针**（`Sources/App/Diagnostics/ScrollDiagnostics.swift`，仅 Debug）
+
+以 `-scrollProbe` 启动后自动来回滚动 10 秒，用 `CADisplayLink` 逐帧记录真实帧间隔，滚动结束后在控制台打印：
+
+```
+────────── 滚动流畅度报告 ──────────
+采集 10.00s，共 598 帧
+中位 16.67 ms（≈ 60.0 fps）  ← 实际帧率
+p95 16.69 ms | p99 16.71 ms | 最大 16.75 ms
+卡顿帧(>1.5×中位) 0 帧，占 0.0%
+──────────── 期间视图重建次数 ────────────
+RootView.body            0 次
+MonthGrid.make           0 次
+DayCell.body             0 次
+DayDetailView.body       0 次
+```
+
+**测量手段二：XCUITest + 官方性能指标**（`Tests/UITests/ScrollPerformanceTests.swift`）
+
+程序化滚动**不经过手势系统**，测不出「自定义手势与 ScrollView 抢手势」这类问题，因此必须用真实触摸（`swipeUp`）。指标：
+
+- `XCTOSSignpostMetric.scrollingAndDecelerationMetric`（旧的 `scrollDecelerationMetric` 只覆盖减速段且已废弃）
+- `XCTCPUMetric`：区分「渲染贵」还是「计算贵」
+- `XCTHitchMetric`：Xcode 26 新增的卡顿指标（实测仅在真机产出数据）
+
+**关键数据**（iPhone 17 模拟器，iOS 26.5）
+
+| 场景 | 帧率 | 掉帧 | CPU Time | 滚动期间视图重建 |
+|---|---|---|---|---|
+| 首页滚到底再滚回（Debug） | 锁定 60 fps | **0 帧** | 0.296 s | 0 次 |
+| 同上（Release） | 锁定 60 fps | **0 帧** | 0.289 s | 0 次 |
+| 悬浮「今天」按钮可见（Debug） | 锁定 60 fps | **0 帧** | — | 0 次 |
+
+**结论：滚动路径已经退化成纯粹的「图层平移」**——不重算农历、不重建视图、不重排布局，Debug 与 Release 无差异，CPU 仅占单核约 16%。**代码层面不存在可复现的掉帧问题。**
+
+**但排查过程中发现并修掉了 4 个真实缺陷**（它们主要影响交互延迟与设备端 GPU，不体现在模拟器的帧率上）：
+
+| # | 问题 | 为什么是问题 | 修法 |
+|---|---|---|---|
+| 1 | 滚动内容挂了 `.gesture(DragGesture)` | 自定义拖拽手势会与 ScrollView 的 pan 手势**争夺识别权**，系统要等仲裁完才开始滚动 → 「按下去卡一下才跟手」 | 改为 `.simultaneousGesture`，并只在「横向位移 > 纵向 1.5 倍」时才翻月 |
+| 2 | 42 个日期格子都是 `Button` | 每个 `Button` 都参与触摸/手势仲裁，一个月 42 个 | 改 `.onTapGesture` + `.accessibilityAddTraits(.isButton)`，语义不变（有回归测试守着） |
+| 3 | 42 个格子各有一层 `.opacity()` | 每层都是一个独立合成图层 | 「非本月变淡」改用**颜色带透明度**实现，图层数归零 |
+| 4 | `LazyVGrid` 装 42 个固定高度格子 | 格子全部在屏内，惰性容器只剩开销；且惰性容器会随进出视口创建/销毁子视图 | 改成**手工切行**的定高网格，布局退化为简单算术 |
+
+另外给 `FlowLayout` 补上了真正的 `Cache`（原来是 `cache: inout ()`，等于每次布局都重新做 20+ 次 CoreText 文本测量）。
+
+**给使用者的一把尺子**：设置页 → 「开发者选项 · 仅 Debug」→「显示帧率 HUD」，返回首页即可在左下角实时看到 `fps / 最差单帧耗时 / 卡顿帧数`（点 HUD 清零）。若「卡顿」始终为 0 且 fps ≥ 55，说明**渲染没有掉帧**，此时若仍觉得不跟手，问题在交互而非渲染。
+
+> 排错提示：如果感觉卡但这里显示 0 卡顿，请依次排查 ① 是否在真机（模拟器渲染走 Mac GPU，与设备表现不同）；② 是否用 **Xcode 运行且挂载了调试器**（`Debug executable` 勾选会显著拖慢）；③ 机型/系统是否较旧或正在热降频。
 
 ---
 

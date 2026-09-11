@@ -23,6 +23,11 @@ struct RootView: View {
     /// 仅调试用：启动后是否自动弹出「组件样式预览」（由启动参数 `-showWidgetPreview` 触发）。
     @State private var autoShowWidgetPreview = false
 
+    #if DEBUG
+    /// 仅 Debug：是否在首页显示实时帧率 HUD（设置页里开关）。
+    @AppStorage("showFPSHud") private var showFPSHud = false
+    #endif
+
     private let today = SolarDate.today
 
     init() {
@@ -73,10 +78,33 @@ struct RootView: View {
 
         return (date, mode, showSettings, showWidgetPreview)
     }
+
+    /// 仅 Debug：`-scrollProbe` 时启动「自动滚动 + 帧间隔探针」，把滚动流畅度变成可比较的数字。
+    private func startScrollProbeIfNeeded(proxy: ScrollViewProxy) {
+        guard ScrollDiagnostics.isEnabled || ScrollDiagnostics.isStaticProbe else { return }
+        // 等首帧渲染完成再开始采样，避免把冷启动开销算进滚动数据。
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            ScrollFrameProbe.shared.start(duration: 10)
+            if ScrollDiagnostics.isEnabled {
+                AutoScroller().run(proxy: proxy)
+            }
+        }
+    }
+    #endif
+
+    #if !DEBUG
+    /// Release 下不做事：滚动诊断工具仅存在于 Debug 构建。
+    /// 保留同名方法是为了让 `body` 里的调用在两个配置下都能编译。
+    private func startScrollProbeIfNeeded(proxy: ScrollViewProxy) {
+        _ = proxy
+    }
     #endif
 
     private var grid: MonthGrid {
-        MonthGrid.make(year: displayedYear, month: displayedMonth, weekStartsOnMonday: weekStartsOnMonday)
+        #if DEBUG
+        let _: Void = { RenderCounter.monthGridMake += 1 }()
+        #endif
+        return MonthGrid.make(year: displayedYear, month: displayedMonth, weekStartsOnMonday: weekStartsOnMonday)
     }
 
     private var selectedInfo: DayInfo? { DayInfo.make(solar: selectedDate) }
@@ -88,6 +116,10 @@ struct RootView: View {
     }
 
     var body: some View {
+        // Debug 下统计 body 求值次数（ViewBuilder 里不能写裸语句，故用立即执行闭包）。
+        #if DEBUG
+        let _: Void = { RenderCounter.rootBody += 1 }()
+        #endif
         // `grid` 在这里**只求值一次**再往下传。
         // 它是计算属性（内含 42 天的完整信息），若在 body 里被多次访问会重复计算。
         content(for: grid)
@@ -103,6 +135,7 @@ struct RootView: View {
                         header(for: grid)
                             .padding(.horizontal, 20)
                             .padding(.top, 8)
+                            .id(ScrollAnchor.top)
 
                         switch mode {
                         case .month:
@@ -128,9 +161,17 @@ struct RootView: View {
                         }
 
                         Spacer(minLength: 90)
+                            .id(ScrollAnchor.bottom)
                     }
                     .contentShape(Rectangle())
-                    .gesture(swipeGesture)
+                    // 用 `simultaneousGesture` 而不是 `gesture`：
+                    // 后者会让自定义拖拽手势与 ScrollView 内置的 pan 手势**争夺识别权**，
+                    // 系统必须等两者仲裁完才能开始滚动，表现为「手指按下去要卡一下才跟手」。
+                    // `simultaneousGesture` 允许两者同时识别，滚动因此不再被拖慢。
+                    .simultaneousGesture(swipeGesture)
+                }
+                .onAppear {
+                    startScrollProbeIfNeeded(proxy: proxy)
                 }
                 .onChange(of: selectedDate) { _, _ in
                     // 选中相邻月份的日期时，同步显示月份
@@ -150,6 +191,16 @@ struct RootView: View {
                     .padding(.bottom, 24)
                     .transition(.scale.combined(with: .opacity))
             }
+
+            #if DEBUG
+            // 实时帧率 HUD：左下角，避开右下角的「今天」按钮。
+            if showFPSHud {
+                FPSHudView()
+                    .padding(.leading, 16)
+                    .padding(.bottom, 24)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            }
+            #endif
         }
         // 字号倍率只在这里算一次（系统动态字体 × 「大字体模式」），往下走环境传递。
         .providesFontScale(extra: largeFontMode ? 1.18 : 1)
@@ -328,9 +379,14 @@ struct RootView: View {
     private var swipeGesture: some Gesture {
         DragGesture(minimumDistance: 24)
             .onEnded { value in
-                if value.translation.width < -50 {
+                let dx = value.translation.width
+                let dy = value.translation.height
+                // 只有「横向位移明显大于纵向」时才当作翻月手势。
+                // 纵向为主的拖动一律放行给 ScrollView，避免误吞上下滚动。
+                guard abs(dx) > abs(dy) * 1.5 else { return }
+                if dx < -50 {
                     advance(1)
-                } else if value.translation.width > 50 {
+                } else if dx > 50 {
                     advance(-1)
                 }
             }

@@ -1,16 +1,45 @@
 import SwiftUI
 
 /// 自动换行的流式布局（用于宜忌标签）。
+///
+/// 性能要点：`Layout` 协议允许通过 `Cache` 缓存测量结果。
+/// 这里**必须实现缓存**——不实现（`cache: inout ()`）意味着每次布局都要
+/// 对所有子视图重新调用 `sizeThatFits`，而子视图是 `Text`，一次测量就是一次
+/// CoreText 文本排版；详情页有 4 处流式布局、合计 20+ 个子视图，代价不小。
+/// 子视图的固有尺寸与容器宽度无关，因此只在子视图变化时重算即可。
 struct FlowLayout: Layout {
     var spacing: CGFloat = 6
 
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+    /// 缓存：每个子视图的固有尺寸。
+    struct Cache {
+        var sizes: [CGSize] = []
+    }
+
+    func makeCache(subviews: Subviews) -> Cache {
+        Cache(sizes: subviews.map { $0.sizeThatFits(.unspecified) })
+    }
+
+    func updateCache(_ cache: inout Cache, subviews: Subviews) {
+        cache.sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+    }
+
+    /// 取尺寸：缓存数量对不上时（子视图增删）兜底重算。
+    private func sizes(_ subviews: Subviews, cache: inout Cache) -> [CGSize] {
+        if cache.sizes.count != subviews.count {
+            cache.sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        }
+        return cache.sizes
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) -> CGSize {
         let maxWidth = proposal.width ?? .infinity
+        let sizes = sizes(subviews, cache: &cache)
+
         var currentWidth: CGFloat = 0
         var currentHeight: CGFloat = 0
         var rowHeight: CGFloat = 0
-        for sub in subviews {
-            let size = sub.sizeThatFits(.unspecified)
+
+        for size in sizes {
             if currentWidth + size.width > maxWidth && currentWidth > 0 {
                 currentHeight += rowHeight + spacing
                 currentWidth = 0
@@ -23,12 +52,15 @@ struct FlowLayout: Layout {
         return CGSize(width: maxWidth == .infinity ? currentWidth : maxWidth, height: currentHeight)
     }
 
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) {
+        let sizes = sizes(subviews, cache: &cache)
+
         var x = bounds.minX
         var y = bounds.minY
         var rowHeight: CGFloat = 0
-        for sub in subviews {
-            let size = sub.sizeThatFits(.unspecified)
+
+        for (index, sub) in subviews.enumerated() {
+            let size = sizes[index]
             if x + size.width > bounds.maxX && x > bounds.minX {
                 x = bounds.minX
                 y += rowHeight + spacing
@@ -50,6 +82,9 @@ struct DayDetailView: View {
     private var historyEvents: [HistoryEvent] { HistoryToday.events(on: info.solar) }
 
     var body: some View {
+        #if DEBUG
+        let _: Void = { RenderCounter.dayDetailBody += 1 }()
+        #endif
         VStack(spacing: 14) {
             heroCard
             if showAlmanac {

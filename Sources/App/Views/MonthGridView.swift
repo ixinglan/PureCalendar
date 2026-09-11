@@ -2,9 +2,13 @@ import SwiftUI
 
 /// 单个日期格子。
 ///
-/// 性能要点（勿改）：格子是全屏重复次数最多的视图（6×7 = 42 个），因此
-/// 1. `scale` 由父视图**以参数传入**，格子内部不再持有任何 `@ScaledMetric` / `@Environment`；
-/// 2. 字号与行高都用 `.frame(height:)` **写死高度**，避免 LazyVGrid 逐格测量内容固有尺寸。
+/// 性能要点（勿改）：
+/// 1. `scale` 由父视图**以参数传入**，格子内部不持有任何 `@ScaledMetric` / `@Environment`；
+/// 2. 字号与行高都用 `.frame(height:)` **写死高度**，避免逐格测量内容固有尺寸；
+/// 3. 用 `.onTapGesture` 而不是 `Button`——一个月 42 个 `Button` 会各自参与触摸/手势仲裁，
+///    在 ScrollView 里会拖慢滚动的响应；
+/// 4. 「非本月日期变淡」用**文字颜色带透明度**实现，而不是给整个格子加 `.opacity()`——
+///    后者会让 42 个格子各自产生一个合成图层。
 struct DayCell: View {
     let cell: CalendarCell
     let isSelected: Bool
@@ -17,32 +21,36 @@ struct DayCell: View {
     /// 格子固定高度（随字号倍率一起放大）。
     private var cellHeight: CGFloat { 46 * scale }
 
-    var body: some View {
-        Button(action: onTap) {
-            VStack(spacing: 1) {
-                Text(verbatim: "\(info.solar.day)")
-                    .font(.system(size: 17 * scale, weight: numberWeight, design: .rounded))
-                    .foregroundStyle(numberColor)
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+    /// 非本月日期的淡化系数（作用于颜色，而非整视图透明度）。
+    private var dim: Double { cell.inCurrentMonth ? 1 : 0.32 }
 
-                Text(cell.inCurrentMonth ? info.cellSubtitle : " ")
-                    .font(.system(size: 9.5 * scale, weight: .medium, design: .rounded))
-                    .foregroundStyle(subtitleColor)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: cellHeight)
-            .background(background)
-            .contentShape(Rectangle())
+    var body: some View {
+        #if DEBUG
+        let _: Void = { RenderCounter.dayCellBody += 1 }()
+        #endif
+        VStack(spacing: 1) {
+            Text(verbatim: "\(info.solar.day)")
+                .font(.system(size: 17 * scale, weight: numberWeight, design: .rounded))
+                .foregroundStyle(numberColor.opacity(dim))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+
+            Text(cell.inCurrentMonth ? info.cellSubtitle : " ")
+                .font(.system(size: 9.5 * scale, weight: .medium, design: .rounded))
+                .foregroundStyle(subtitleColor.opacity(dim))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
         }
-        .buttonStyle(.plain)
-        .opacity(cell.inCurrentMonth ? 1 : 0.32)
+        .frame(maxWidth: .infinity)
+        .frame(height: cellHeight)
+        .background(background)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onTap)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)
-        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+        // 用 onTapGesture 替代 Button 后，手动补回「按钮」语义，VoiceOver 体验不变。
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : [.isButton])
     }
 
     // MARK: - 样式
@@ -73,6 +81,10 @@ struct DayCell: View {
         }
     }
 
+    /// 选中 / 今天的底色。
+    ///
+    /// 其余日期返回 `Color.clear`：透明填充不需要真实绘制，代价可忽略，
+    /// 省掉一层 `@ViewBuilder` 分支判断。
     @ViewBuilder
     private var background: some View {
         if isSelected {
@@ -86,8 +98,7 @@ struct DayCell: View {
                         .stroke(Palette.accent.opacity(0.6), lineWidth: 1.2)
                 )
         } else {
-            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .fill(Color.clear)
+            Color.clear
         }
     }
 
@@ -105,6 +116,10 @@ struct DayCell: View {
 }
 
 /// 月历网格：星期表头 + 6×7 日期。
+///
+/// 性能要点：这里**刻意不用 `LazyVGrid`**。一个月固定 42 格、且全部在屏幕内，
+/// 惰性容器带来的是纯粹开销（惰性子视图管理 + 逐格测量）。
+/// 改成「手工切行 + 固定行高」后布局退化成简单的算术，成本大幅下降。
 struct MonthGridView: View {
     let grid: MonthGrid
     @Binding var selectedDate: SolarDate
@@ -113,7 +128,12 @@ struct MonthGridView: View {
     /// 全站字号倍率。这里**读一次**并传给 42 个格子，避免每格各建一个环境依赖。
     @Environment(\.fontScale) private var fontScale
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
+    /// 每行 7 个格子，按周切分。
+    private var rows: [[CalendarCell]] {
+        stride(from: 0, to: grid.cells.count, by: 7).map {
+            Array(grid.cells[$0..<min($0 + 7, grid.cells.count)])
+        }
+    }
 
     private var weekdays: [String] {
         weekStartsOnMonday
@@ -134,15 +154,19 @@ struct MonthGridView: View {
             }
             .accessibilityHidden(true)
 
-            // 日期网格
-            LazyVGrid(columns: columns, spacing: 6) {
-                ForEach(grid.cells) { cell in
-                    DayCell(
-                        cell: cell,
-                        isSelected: cell.info.solar == selectedDate,
-                        scale: fontScale,
-                        onTap: { select(cell) }
-                    )
+            // 日期网格：手工切行，行与列都用固定间距，布局无需测量
+            VStack(spacing: 6) {
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                    HStack(spacing: 4) {
+                        ForEach(row) { cell in
+                            DayCell(
+                                cell: cell,
+                                isSelected: cell.info.solar == selectedDate,
+                                scale: fontScale,
+                                onTap: { select(cell) }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -156,7 +180,7 @@ struct MonthGridView: View {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .stroke(Palette.separator.opacity(0.5), lineWidth: 0.5)
         )
-        .shadow(color: Palette.shadow, radius: 14, x: 0, y: 8)
+        .shadow(color: Palette.shadow, radius: 10, x: 0, y: 5)
     }
 
     private func isWeekendColumn(_ index: Int) -> Bool {

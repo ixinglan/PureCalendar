@@ -10,6 +10,11 @@ struct SettingsView: View {
     @AppStorage("largeFontMode") private var largeFontMode = false
     @Environment(\.dismiss) private var dismiss
 
+    #if DEBUG
+    /// 仅 Debug：首页右上角的实时帧率 HUD 开关。
+    @AppStorage("showFPSHud") private var showFPSHud = false
+    #endif
+
     // 节假日数据状态（本地缓存 + 远程更新）
     @State private var holidaySummary = HolidayStore.summary
     @State private var holidayStamp = HolidayStore.dataTimestamp
@@ -31,6 +36,9 @@ struct SettingsView: View {
                     holidaySection
                     widgetSection
                     aboutSection
+                    #if DEBUG
+                    developerSection
+                    #endif
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 20)
@@ -265,6 +273,36 @@ struct SettingsView: View {
         }
         .card()
     }
+
+    // MARK: - 开发者选项（仅 Debug 构建）
+
+    #if DEBUG
+    private var developerSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            sectionTitle("开发者选项 · 仅 Debug")
+
+            Toggle(isOn: $showFPSHud) {
+                settingLabel(title: "显示帧率 HUD",
+                             detail: "在首页左下角实时显示 fps、最差单帧耗时与卡顿帧数")
+            }
+            .tint(Palette.accent)
+            .accessibilityHint("打开后返回首页上下滑动，即可看到实时帧率")
+
+            Text("用法：打开此开关 → 返回首页 → 用手指上下滑动。若「卡顿」一栏始终为 0、fps 稳定在 55 以上，说明渲染没有掉帧，此时若仍觉得不跟手，问题多半在手势/交互而不在渲染。点击 HUD 可清零重新计数。")
+                .scaledFont(12, weight: .regular, design: .rounded)
+                .foregroundStyle(Palette.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Divider().overlay(Palette.separator)
+
+            Text("命令行自检：以 `-scrollProbe` 启动会自动来回滚动 10 秒并在控制台打印帧统计；`-scrollProbeStatic` 则只统计、不自动滚动，供你手动滑动时采样。")
+                .scaledFont(12, weight: .regular, design: .rounded)
+                .foregroundStyle(Palette.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .card()
+    }
+    #endif
 
     // MARK: - 组件
 

@@ -62,3 +62,29 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         TARGETED_DEVICE_FAMILY: "1"
         SKIP_INSTALL: YES
+
+  # UI 测试：滚动性能（真实触摸手势，测滚动卡顿指标）
+  CalendarAppUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: Tests/UITests
+    dependencies:
+      - target: CalendarApp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ixiaoqiang.calendarapp.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "1"
+
+schemes:
+  CalendarApp:
+    build:
+      targets:
+        CalendarApp: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - CalendarAppUITests
