@@ -194,7 +194,7 @@ struct LargeWidgetView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
-                Text(grid.title)
+                Text(verbatim: grid.title)
                     .font(.system(size: 16, weight: .bold, design: .rounded))
                 Spacer()
                 Text("今天 \(info.solar.day) 日 · \(info.lunar.dayChinese)")

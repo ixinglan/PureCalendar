@@ -16,6 +16,9 @@ struct MonthGrid: Identifiable {
     var id: String { "\(year)-\(month)" }
 
     /// 标题，如「2026 年 9 月」。
+    ///
+    /// ⚠️ 这里是**纯 String 拼接**（不经过 SwiftUI 的 LocalizedStringKey），
+    /// 因此年份不会被格式化成「2,026」。UI 层请用 `Text(verbatim: title)` 渲染。
     var title: String { "\(year) 年 \(month) 月" }
 
     /// 该月第一天。

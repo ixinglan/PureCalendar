@@ -83,7 +83,9 @@ struct RootView: View {
     private var header: some View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 3) {
-                Text("\(displayedYear) 年 \(displayedMonth) 月")
+                // 用 Text(verbatim:) 渲染，避免 SwiftUI 的 LocalizedStringKey 把年份格式化成「2,026」。
+                // 标题统一取自 MonthGrid.title，保证年份格式只有一处定义。
+                Text(verbatim: grid.title)
                     .font(.system(size: 27, weight: .bold, design: .rounded))
                     .foregroundStyle(.primary)
                 Text(subtitleText)
