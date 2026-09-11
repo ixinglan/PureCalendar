@@ -1,31 +1,40 @@
 import SwiftUI
 
 /// 单个日期格子。
+///
+/// 性能要点（勿改）：格子是全屏重复次数最多的视图（6×7 = 42 个），因此
+/// 1. `scale` 由父视图**以参数传入**，格子内部不再持有任何 `@ScaledMetric` / `@Environment`；
+/// 2. 字号与行高都用 `.frame(height:)` **写死高度**，避免 LazyVGrid 逐格测量内容固有尺寸。
 struct DayCell: View {
     let cell: CalendarCell
     let isSelected: Bool
+    /// 全站字号倍率，由 `MonthGridView` 统一读取后传入。
+    let scale: CGFloat
     let onTap: () -> Void
 
     private var info: DayInfo { cell.info }
+
+    /// 格子固定高度（随字号倍率一起放大）。
+    private var cellHeight: CGFloat { 46 * scale }
 
     var body: some View {
         Button(action: onTap) {
             VStack(spacing: 1) {
                 Text(verbatim: "\(info.solar.day)")
-                    .scaledFont(17, weight: numberWeight, design: .rounded)
+                    .font(.system(size: 17 * scale, weight: numberWeight, design: .rounded))
                     .foregroundStyle(numberColor)
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
 
                 Text(cell.inCurrentMonth ? info.cellSubtitle : " ")
-                    .scaledFont(9.5, weight: .medium, design: .rounded)
+                    .font(.system(size: 9.5 * scale, weight: .medium, design: .rounded))
                     .foregroundStyle(subtitleColor)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
             }
             .frame(maxWidth: .infinity)
-            .frame(minHeight: 46)
+            .frame(height: cellHeight)
             .background(background)
             .contentShape(Rectangle())
         }
@@ -84,16 +93,14 @@ struct DayCell: View {
 
     /// VoiceOver 朗读文案：把格子里「看得到但读不出来」的信息补全。
     private var accessibilityLabel: String {
-        var parts: [String] = ["\(info.solar.year) 年 \(info.solar.month) 月 \(info.solar.day) 日"]
-        parts.append(info.solar.weekdayChinese)
-        if info.isToday { parts.append("今天") }
-        parts.append("农历\(info.lunar.monthChinese)\(info.lunar.dayChinese)")
-        if let holiday = info.primaryHoliday { parts.append(holiday.name) }
-        if let term = info.lunar.term, info.primaryHoliday?.name != term { parts.append(term) }
-        if let badge = info.dayOffBadge {
-            parts.append(badge == "休" ? "放假" : "调休上班")
-        }
-        return parts.joined(separator: "，")
+        let solar = info.solar
+        var text = "\(solar.year) 年 \(solar.month) 月 \(solar.day) 日，\(solar.weekdayChinese)"
+        if info.isToday { text += "，今天" }
+        text += "，农历\(info.lunar.monthChinese)\(info.lunar.dayChinese)"
+        if let holiday = info.primaryHoliday { text += "，\(holiday.name)" }
+        if let term = info.lunar.term, info.primaryHoliday?.name != term { text += "，\(term)" }
+        if let badge = info.dayOffBadge { text += badge == "休" ? "，放假" : "，调休上班" }
+        return text
     }
 }
 
@@ -102,6 +109,9 @@ struct MonthGridView: View {
     let grid: MonthGrid
     @Binding var selectedDate: SolarDate
     var weekStartsOnMonday: Bool
+
+    /// 全站字号倍率。这里**读一次**并传给 42 个格子，避免每格各建一个环境依赖。
+    @Environment(\.fontScale) private var fontScale
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
 
@@ -117,7 +127,7 @@ struct MonthGridView: View {
             HStack(spacing: 4) {
                 ForEach(Array(weekdays.enumerated()), id: \.offset) { index, name in
                     Text(name)
-                        .scaledFont(12, weight: .semibold, design: .rounded)
+                        .font(.system(size: 12 * fontScale, weight: .semibold, design: .rounded))
                         .foregroundStyle(isWeekendColumn(index) ? Palette.accent.opacity(0.75) : Palette.secondaryText)
                         .frame(maxWidth: .infinity)
                 }
@@ -130,6 +140,7 @@ struct MonthGridView: View {
                     DayCell(
                         cell: cell,
                         isSelected: cell.info.solar == selectedDate,
+                        scale: fontScale,
                         onTap: { select(cell) }
                     )
                 }

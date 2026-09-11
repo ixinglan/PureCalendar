@@ -20,6 +20,8 @@ struct RootView: View {
     @State private var showSettings = false
     @State private var mode: BrowseMode = .month
     @State private var todayResetToken = 0
+    /// 仅调试用：启动后是否自动弹出「组件样式预览」（由启动参数 `-showWidgetPreview` 触发）。
+    @State private var autoShowWidgetPreview = false
 
     private let today = SolarDate.today
 
@@ -28,7 +30,7 @@ struct RootView: View {
         #if DEBUG
         let options = RootView.debugLaunchOptions()
         #else
-        let options = (date: SolarDate.today, mode: BrowseMode.month, showSettings: false)
+        let options = (date: SolarDate.today, mode: BrowseMode.month, showSettings: false, showWidgetPreview: false)
         #endif
 
         _displayedYear = State(initialValue: options.date.year)
@@ -36,6 +38,7 @@ struct RootView: View {
         _selectedDate = State(initialValue: options.date)
         _mode = State(initialValue: options.mode)
         _showSettings = State(initialValue: options.showSettings)
+        _autoShowWidgetPreview = State(initialValue: options.showWidgetPreview)
     }
 
     #if DEBUG
@@ -46,8 +49,9 @@ struct RootView: View {
     /// xcrun simctl launch booted com.ixiaoqiang.calendarapp -startMode year
     /// xcrun simctl launch booted com.ixiaoqiang.calendarapp -startDate 2026-10-01
     /// xcrun simctl launch booted com.ixiaoqiang.calendarapp -showSettings
+    /// xcrun simctl launch booted com.ixiaoqiang.calendarapp -showWidgetPreview
     /// ```
-    private static func debugLaunchOptions() -> (date: SolarDate, mode: BrowseMode, showSettings: Bool) {
+    private static func debugLaunchOptions() -> (date: SolarDate, mode: BrowseMode, showSettings: Bool, showWidgetPreview: Bool) {
         var date = SolarDate.today
         var mode: BrowseMode = .month
         var showSettings = false
@@ -63,8 +67,11 @@ struct RootView: View {
             }
         }
         if args.contains("-showSettings") { showSettings = true }
+        // 组件预览内嵌在设置页里，因此触发它时同时把设置页打开。
+        let showWidgetPreview = args.contains("-showWidgetPreview")
+        if showWidgetPreview { showSettings = true }
 
-        return (date, mode, showSettings)
+        return (date, mode, showSettings, showWidgetPreview)
     }
     #endif
 
@@ -81,13 +88,19 @@ struct RootView: View {
     }
 
     var body: some View {
+        // `grid` 在这里**只求值一次**再往下传。
+        // 它是计算属性（内含 42 天的完整信息），若在 body 里被多次访问会重复计算。
+        content(for: grid)
+    }
+
+    private func content(for grid: MonthGrid) -> some View {
         ZStack(alignment: .bottomTrailing) {
             Palette.background.ignoresSafeArea()
 
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(spacing: 16) {
-                        header
+                        header(for: grid)
                             .padding(.horizontal, 20)
                             .padding(.top, 8)
 
@@ -138,7 +151,8 @@ struct RootView: View {
                     .transition(.scale.combined(with: .opacity))
             }
         }
-        .environment(\.fontScale, largeFontMode ? 1.18 : 1)
+        // 字号倍率只在这里算一次（系统动态字体 × 「大字体模式」），往下走环境传递。
+        .providesFontScale(extra: largeFontMode ? 1.18 : 1)
         .animation(.snappy(duration: 0.25), value: isOnToday)
         .animation(.snappy(duration: 0.28), value: mode)
         // 触觉反馈（无障碍：为非视觉用户提供操作确认）
@@ -147,21 +161,21 @@ struct RootView: View {
         .sensoryFeedback(.impact(weight: .light), trigger: displayedYear)
         .sensoryFeedback(.success, trigger: todayResetToken)
         .sheet(isPresented: $showSettings) {
-            SettingsView()
+            SettingsView(autoShowWidgetPreview: autoShowWidgetPreview)
         }
     }
 
     // MARK: - 顶部导航
 
     @ViewBuilder
-    private var header: some View {
+    private func header(for grid: MonthGrid) -> some View {
         switch mode {
-        case .month: monthHeader
+        case .month: monthHeader(grid)
         case .year: yearHeader
         }
     }
 
-    private var monthHeader: some View {
+    private func monthHeader(_ grid: MonthGrid) -> some View {
         HStack(alignment: .center) {
             // 点标题展开年视图（与 Apple 日历一致的手势心智）。
             Button {
@@ -177,13 +191,13 @@ struct RootView: View {
                             .font(.system(size: 11, weight: .bold))
                             .foregroundStyle(Palette.secondaryText)
                     }
-                    Text(subtitleText)
+                    Text(subtitleText(of: grid))
                         .scaledFont(13, weight: .medium, design: .rounded)
                         .foregroundStyle(Palette.secondaryText)
                 }
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("\(grid.title)，\(subtitleText)")
+            .accessibilityLabel("\(grid.title)，\(subtitleText(of: grid))")
             .accessibilityHint("展开年视图")
 
             Spacer()
@@ -229,13 +243,14 @@ struct RootView: View {
         }
     }
 
-    private var subtitleText: String {
+    private func subtitleText(of grid: MonthGrid) -> String {
         guard let first = DayInfo.make(solar: grid.firstDay) else { return "" }
         return "\(first.lunar.ganZhiYear)年 · 属\(first.lunar.zodiac)"
     }
 
+    /// 年视图副标题：该年干支 + 生肖（轻量算法，不构建整年网格）。
     private var yearSubtitleText: String {
-        CalendarYear.make(year: displayedYear).ganZhiZodiac ?? ""
+        CalendarYear.ganZhiZodiac(of: displayedYear) ?? ""
     }
 
     private func navButton(systemName: String, label: String, action: @escaping () -> Void) -> some View {

@@ -18,11 +18,6 @@ struct CalendarYear: Identifiable {
     ///
     /// 这里刻意**不**去构建 12 个月网格，而是直接算该年 7 月 1 日所属的农历年——
     /// 7 月必然晚于春节（最晚 2 月下旬），因此能稳定取到该公历年对应的农历年。
-    var ganZhiZodiac: String? {
-        CalendarYear.ganZhiZodiac(of: year)
-    }
-
-    /// 轻量计算：某公历年对应的干支年与生肖。
     static func ganZhiZodiac(of year: Int) -> String? {
         guard let lunar = LunarCalendar.lunar(from: SolarDate(year: year, month: 7, day: 1)) else { return nil }
         return "\(lunar.ganZhiYear)年 · 属\(lunar.zodiac)"

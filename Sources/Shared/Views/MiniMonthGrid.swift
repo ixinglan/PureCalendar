@@ -10,8 +10,16 @@ struct MiniMonthGrid: View {
     var showWeekHeader: Bool = true
     var numberSize: CGFloat = 11
     var rowSpacing: CGFloat = 2
+    /// 日期数字行在字号之外额外占用的高度（越小越紧凑）。
+    /// 中尺寸组件纵向空间紧张时调小该值，年视图保持默认即可。
+    var cellPadding: CGFloat = 7
+    /// 日期下方「节日/节气标记点」的直径；设为 0 可彻底不占高度。
+    var dotSize: CGFloat = 3
     /// 周一为每周第一天（与主视图设置保持一致）。
     var weekStartsOnMonday: Bool = false
+
+    /// 字号倍率只读一次，避免 42 个格子各建一个环境依赖。
+    @Environment(\.fontScale) private var fontScale
 
     private var rows: [[CalendarCell]] {
         stride(from: 0, to: grid.cells.count, by: 7)
@@ -22,13 +30,16 @@ struct MiniMonthGrid: View {
         weekStartsOnMonday ? ["一", "二", "三", "四", "五", "六", "日"] : ["日", "一", "二", "三", "四", "五", "六"]
     }
 
+    /// 按字号倍率放大后的日期字号（所有尺寸都按同一倍率缩放，保证比例不变）。
+    private var scaledNumberSize: CGFloat { numberSize * fontScale }
+
     var body: some View {
-        VStack(spacing: rowSpacing) {
+        VStack(spacing: rowSpacing * fontScale) {
             if showWeekHeader {
                 HStack(spacing: 0) {
                     ForEach(Array(weekdayNames.enumerated()), id: \.offset) { index, name in
                         Text(name)
-                            .font(.system(size: max(6, numberSize * 0.78), weight: .semibold, design: .rounded))
+                            .font(.system(size: max(6, scaledNumberSize * 0.78), weight: .semibold, design: .rounded))
                             .foregroundStyle(isWeekendColumn(index)
                                              ? Palette.accent.opacity(0.7)
                                              : Palette.secondaryText)
@@ -51,24 +62,25 @@ struct MiniMonthGrid: View {
     }
 
     private func cellView(_ cell: CalendarCell) -> some View {
+        let size = scaledNumberSize
         let isHighlighted = highlight != nil && cell.info.solar == highlight
         return VStack(spacing: 0) {
             ZStack {
                 if isHighlighted {
                     Circle()
                         .fill(Palette.accent)
-                        .frame(width: numberSize + 6, height: numberSize + 6)
+                        .frame(width: size + 6, height: size + 6)
                 }
-                Text("\(cell.info.solar.day)")
-                    .font(.system(size: numberSize, weight: isHighlighted ? .bold : .medium, design: .rounded))
+                Text(verbatim: "\(cell.info.solar.day)")
+                    .font(.system(size: size, weight: isHighlighted ? .bold : .medium, design: .rounded))
                     .foregroundStyle(numberColor(cell, isHighlighted: isHighlighted))
                     .monospacedDigit()
             }
-            .frame(height: numberSize + 7)
+            .frame(height: size + cellPadding * fontScale)
 
             Circle()
                 .fill(dotColor(cell))
-                .frame(width: 3, height: 3)
+                .frame(width: dotSize * fontScale, height: dotSize * fontScale)
                 .opacity(cell.inCurrentMonth ? 1 : 0)
         }
         .frame(maxWidth: .infinity)

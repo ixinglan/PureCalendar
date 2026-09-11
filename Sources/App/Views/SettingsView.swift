@@ -2,6 +2,9 @@ import SwiftUI
 
 /// 设置页（以 sheet 呈现）。
 struct SettingsView: View {
+    /// 仅调试用：为 true 时进入设置页后自动弹出组件预览（由启动参数 `-showWidgetPreview` 触发）。
+    var autoShowWidgetPreview: Bool = false
+
     @AppStorage("showAlmanac") private var showAlmanac = true
     @AppStorage("weekStartsOnMonday") private var weekStartsOnMonday = false
     @AppStorage("largeFontMode") private var largeFontMode = false
@@ -13,6 +16,7 @@ struct SettingsView: View {
     @State private var holidayStatus: String?
     @State private var isUpdating = false
     @State private var hasCache = HolidayStore.hasCachedData
+    @State private var showWidgetPreview = false
 
     private var remoteConfigured: Bool { HolidayStore.remoteURLString != nil }
 
@@ -33,6 +37,13 @@ struct SettingsView: View {
             }
         }
         .sensoryFeedback(.selection, trigger: largeFontMode)
+        .onAppear {
+            // 调试用：带 `-showWidgetPreview` 启动时直接展开预览，便于自动化截图。
+            if autoShowWidgetPreview { showWidgetPreview = true }
+        }
+        .sheet(isPresented: $showWidgetPreview) {
+            WidgetPreviewView()
+        }
     }
 
     private var header: some View {
@@ -195,6 +206,25 @@ struct SettingsView: View {
             widgetRow(size: "中尺寸", desc: "当月月历缩略 + 今日宜忌", icon: "square.grid.2x2")
             widgetRow(size: "大尺寸", desc: "完整月历 + 今日黄历卡片", icon: "square.grid.3x3")
             widgetRow(size: "锁屏", desc: "矩形 / 行内组件：今日农历与宜忌", icon: "lock.rectangle")
+
+            Button {
+                showWidgetPreview = true
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "eye")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("预览组件样式")
+                        .scaledFont(14, weight: .semibold, design: .rounded)
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundStyle(Palette.accent)
+                .padding(.top, 2)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("按真实尺寸查看三档小组件的渲染效果")
 
             Text("添加方法：长按主屏幕空白处 → 点左上角「+」→ 搜索本 App → 选择尺寸与样式 → 添加。")
                 .scaledFont(12, weight: .regular, design: .rounded)

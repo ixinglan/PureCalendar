@@ -125,7 +125,7 @@ struct TagChip: View {
 
 // MARK: - 无障碍字体缩放
 
-/// App 内「大字体模式」的附加倍率（1 = 标准）。
+/// 全局字号倍率（= 系统「动态字体」倍率 × App 内「大字体模式」附加倍率）。
 private struct FontScaleKey: EnvironmentKey {
     static let defaultValue: CGFloat = 1
 }
@@ -137,30 +137,59 @@ extension EnvironmentValues {
     }
 }
 
-/// 字体修饰器：**同时**响应系统「动态字体（Dynamic Type）」与 App 内「大字体模式」。
+/// 在视图树**顶层**统一计算字号倍率，并注入环境。
+///
+/// 为什么这样设计（性能要点）：
+/// 如果让每个 `Text` 各自持有一个 `@ScaledMetric`，那么一个月历 42 个格子
+/// 就会产生上百个动态属性与上百个修饰器节点，视图图显著变大、布局变慢。
+/// 由于本项目所有字号都以 `.body` 为基准缩放，**倍率是全站统一的**，
+/// 因此只在一个容器上算一次、往下传同一个数即可，视觉效果完全一致。
+struct ProvidesFontScale: ViewModifier {
+    @ScaledMetric(relativeTo: .body) private var dynamicTypeScale: CGFloat = 1
+    /// App 内附加倍率（「大字体模式」开关）。
+    var extra: CGFloat = 1
+
+    func body(content: Content) -> some View {
+        content.environment(\.fontScale, dynamicTypeScale * extra)
+    }
+}
+
+extension View {
+    /// 在顶层注入字号倍率。**每个视图树只需要调用一次**（App 的主视图、每个小组件各一次）。
+    /// 不要重复调用，否则系统动态字体倍率会被叠加多次。
+    func providesFontScale(extra: CGFloat = 1) -> some View {
+        modifier(ProvidesFontScale(extra: extra))
+    }
+}
+
+/// 字体修饰器：按环境里的倍率缩放字号。
 ///
 /// 说明：`Font.system(size:)` 写死的字号不会随系统字体大小变化，不符合无障碍要求。
-/// 这里用 `@ScaledMetric` 让字号跟随系统设置缩放，再叠加 App 内的倍率，
+/// 这里把「系统动态字体」与 App 内「大字体模式」合并成一个倍率（由 `providesFontScale` 注入），
 /// 从而在保持视觉设计不变的前提下满足 WCAG 2.1 AA 对可缩放文字的要求。
 struct ScaledFontModifier: ViewModifier {
-    @ScaledMetric private var baseSize: CGFloat
+    private let size: CGFloat
     private let weight: Font.Weight
     private let design: Font.Design
     @Environment(\.fontScale) private var scale
 
     init(size: CGFloat, weight: Font.Weight, design: Font.Design) {
-        _baseSize = ScaledMetric(wrappedValue: size, relativeTo: .body)
+        self.size = size
         self.weight = weight
         self.design = design
     }
 
     func body(content: Content) -> some View {
-        content.font(.system(size: baseSize * scale, weight: weight, design: design))
+        content.font(.system(size: size * scale, weight: weight, design: design))
     }
 }
 
 extension View {
-    /// 无障碍字体：随系统动态字体缩放，并叠加 App 内「大字体模式」倍率。
+    /// 无障碍字体：字号随系统动态字体与 App 内「大字体模式」一起缩放。
+    ///
+    /// 提示：在**大量重复的视图**（如月历的 42 个格子）里，优先直接读一次
+    /// `EnvironmentValues.fontScale` 再用 `.font(.system(size: base * scale))`，
+    /// 可以省掉每格一个修饰器节点。
     func scaledFont(_ size: CGFloat,
                     weight: Font.Weight = .regular,
                     design: Font.Design = .rounded) -> some View {

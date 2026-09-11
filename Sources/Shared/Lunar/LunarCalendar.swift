@@ -64,25 +64,63 @@ enum LunarCalendar {
         return (LunarData.lunarInfo[year - 1900] & (0x10000 >> month)) != 0 ? 30 : 29
     }
 
+    /// 农历各年的**累计天数前缀和**，用于二分定位农历年（性能关键）。
+    ///
+    /// `cumulativeYearDays[k]` = 农历 1900 年至 (1899 + k) 年的天数之和，k ∈ 0…201。
+    /// 因此 `cumulativeYearDays[0] == 0`、`cumulativeYearDays[1] == lunarYearDays(1900)`，
+    /// 且该数组严格递增，可安全二分。
+    ///
+    /// 引入它的原因：原实现定位农历年时从 1900 年**逐年累减**，算 2026 年的农历
+    /// 也要把 1900–2025 共 126 年的天数全部算一遍（O(n)，约 2000 次位运算）。
+    /// 这是滑动卡顿的主因——一个月的月历要算 42 天，每天都要重复这 126 年。
+    /// 改为前缀和 + 二分后是 O(log n)（约 8 次比较），结果与原算法完全等价。
+    private static let cumulativeYearDays: [Int] = {
+        var result: [Int] = [0]
+        result.reserveCapacity(202)
+        var acc = 0
+        for year in 1900...2100 {
+            acc += lunarYearDays(year)
+            result.append(acc)
+        }
+        return result
+    }()
+
     // MARK: - 节气
 
-    /// 公历 `year` 年第 `n` 个节气（n 从 1 起，1=小寒…24=冬至）所在的日。
-    static func termDay(_ year: Int, _ n: Int) -> Int {
-        guard year >= 1900, year <= 2100, (1...24).contains(n) else { return -1 }
-        let table = Array(LunarData.termInfo[year - 1900])
+    /// 预先解码好的二十四节气日表：`[year - 1900][n - 1]` 即该年第 n 个节气的日。
+    ///
+    /// ⚠️ **这是本项目最要紧的一处性能优化，勿改回即时解码。**
+    /// 原始实现里 `termDay` 每次调用都要把编码串拆成 `[Character]`、再做 6 次
+    /// `String(radix: 16)` / `String(UInt32)` 转换，产生**十几次堆分配**；
+    /// 而计算一天要调用它 3 次（月节气 ×2 + 月柱 ×1），一个月历 42 天就是 120+ 次。
+    /// 改成建表时一次性解码（201 年 × 24 项），之后只是一次数组下标访问。
+    private static let termDayTable: [[Int]] = LunarData.termInfo.map(decodeTermDays)
+
+    /// 解码一年的节气编码串（与原实现逐字符逻辑保持一致）。
+    private static func decodeTermDays(_ encoded: String) -> [Int] {
+        let table = Array(encoded)
         var days: [Int] = []
+        days.reserveCapacity(24)
         for chunk in 0..<6 {
             let start = chunk * 5
-            guard start + 5 <= table.count else { return -1 }
+            guard start + 5 <= table.count else { return days }
             let hex = String(table[start..<(start + 5)])
-            guard let value = UInt32(hex, radix: 16) else { return -1 }
-            var digits = Array(String(value))          // 十进制字符串
-            while digits.count < 6 { digits.insert("0", at: 0) } // 兜底补齐到 6 位
+            guard let value = UInt32(hex, radix: 16) else { return days }
+            var digits = Array(String(value))                       // 十进制字符
+            while digits.count < 6 { digits.insert("0", at: 0) }    // 兜底补齐到 6 位
             days.append(Int(String(digits[0..<1])) ?? 0)
             days.append(Int(String(digits[1..<3])) ?? 0)
             days.append(Int(String(digits[3..<4])) ?? 0)
             days.append(Int(String(digits[4..<6])) ?? 0)
         }
+        return days
+    }
+
+    /// 公历 `year` 年第 `n` 个节气（n 从 1 起，1=小寒…24=冬至）所在的日。
+    static func termDay(_ year: Int, _ n: Int) -> Int {
+        guard year >= 1900, year <= 2100, (1...24).contains(n) else { return -1 }
+        let days = termDayTable[year - 1900]
+        guard n <= days.count else { return -1 }
         return days[n - 1]
     }
 
@@ -102,11 +140,15 @@ enum LunarCalendar {
 
     // MARK: - 干支
 
+    /// 六十甲子表（惰性建一次，避免每次都拼接字符串）。
+    /// 周期为 lcm(10, 12) = 60，因此 `ganZhi(offset) == ganZhiTable[offset mod 60]`。
+    private static let ganZhiTable: [String] = (0..<60).map { i in
+        LunarData.gan[i % 10] + LunarData.zhi[i % 12]
+    }
+
     /// 天干地支（60 甲子）循环。
     static func ganZhi(_ offset: Int) -> String {
-        let gan = LunarData.gan[((offset % 10) + 10) % 10]
-        let zhi = LunarData.zhi[((offset % 12) + 12) % 12]
-        return gan + zhi
+        ganZhiTable[((offset % 60) + 60) % 60]
     }
 
     // MARK: - 公历 → 农历
@@ -122,21 +164,22 @@ enum LunarCalendar {
         // 与 1900-01-31（农历 1900 年正月初一）相差的天数
         var offset = DayMath.daysFromCivil(y, m, d) - DayMath.daysFromCivil(1900, 1, 31)
 
-        // 1) 定位农历年
-        var i = 1900
-        var temp = 0
-        while i < 2101 && offset > 0 {
-            temp = lunarYearDays(i)
-            offset -= temp
-            i += 1
+        // 1) 定位农历年：二分查找最大的 k 使 cumulativeYearDays[k] <= offset。
+        //    （等价于原「从 1900 年逐年累减」的循环，但复杂度从 O(n) 降到 O(log n)。）
+        var lo = 0
+        var hi = 200                       // 1900 + 200 = 2100
+        while lo < hi {
+            let mid = (lo + hi + 1) / 2
+            if cumulativeYearDays[mid] <= offset { lo = mid } else { hi = mid - 1 }
         }
-        if offset < 0 { offset += temp; i -= 1 }
-        let lunarYear = i
+        let lunarYear = 1900 + lo
+        offset -= cumulativeYearDays[lo]
 
         // 2) 定位农历月 / 日
         let leap = leapMonth(lunarYear)
         var isLeap = false
-        i = 1
+        var i = 1
+        var temp = 0
         while i < 13 && offset > 0 {
             if leap > 0 && i == leap + 1 && !isLeap {
                 i -= 1

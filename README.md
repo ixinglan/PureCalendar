@@ -4,9 +4,9 @@
 
 技术栈：**SwiftUI + WidgetKit**，纯原生，无第三方依赖。
 
-| 月视图与黄历 | 年视图 | 历史上的今天 | 大字体模式 | 设置 |
-|---|---|---|---|---|
-| ![](docs/screenshots/01-月视图与黄历.png) | ![](docs/screenshots/02-年视图.png) | ![](docs/screenshots/03-历史上的今天.png) | ![](docs/screenshots/04-大字体模式.png) | ![](docs/screenshots/05-设置.png) |
+| 月视图与黄历 | 年视图 | 历史上的今天 | 大字体模式 | 设置 | 小组件预览 |
+|---|---|---|---|---|---|
+| ![](docs/screenshots/01-月视图与黄历.png) | ![](docs/screenshots/02-年视图.png) | ![](docs/screenshots/03-历史上的今天.png) | ![](docs/screenshots/04-大字体模式.png) | ![](docs/screenshots/05-设置.png) | ![](docs/screenshots/06-小组件预览.png) |
 
 ---
 
@@ -61,6 +61,7 @@ xcrun simctl launch booted com.ixiaoqiang.calendarapp
 xcrun simctl launch booted com.ixiaoqiang.calendarapp -startMode year        # 直接进年视图
 xcrun simctl launch booted com.ixiaoqiang.calendarapp -startDate 2026-10-01  # 直接定位到某天
 xcrun simctl launch booted com.ixiaoqiang.calendarapp -showSettings          # 直接打开设置页
+xcrun simctl launch booted com.ixiaoqiang.calendarapp -showWidgetPreview     # 直接打开「组件样式预览」
 xcrun simctl launch booted com.ixiaoqiang.calendarapp -largeFontMode YES     # 开启大字体（走 UserDefaults）
 ```
 
@@ -90,6 +91,15 @@ xcrun simctl launch booted com.ixiaoqiang.calendarapp -largeFontMode YES     # �
 | **锁屏组件** | 矩形 / 行内两种锁屏配件（V1 已实现，本次补进设置页说明） |
 | **深色主题** | 全站自适应浅色 / 深色（V1 已实现） |
 
+### 3.3 本次修复与优化（V1.2）
+
+| 项 | 说明 |
+|---|---|
+| **小组件显示年 + 月** | 小 / 中 / 大三档桌面组件均在顶部显示「YYYY 年 M 月」（如 `2026 年 9 月`）；中尺寸右侧迷你月历额外标出当月月份。锁屏矩形 / 行内组件**刻意不显示年份**（宽度极小，4 位年份会挤掉农历日与节日名） |
+| **组件样式预览** | 设置页新增「预览组件样式」，在 App 内按**真机点值尺寸**渲染三档组件，免去「先加到主屏才能看效果」的来回折腾 |
+| **中尺寸组件溢出修复** | 迷你月历每格行高固定为「字号 + 7 + 圆点」，6 行约 143pt > 中尺寸可用的 ~126pt，导致月历末行与「宜/忌」被挤出卡片。现为 `MiniMonthGrid` 增加 `cellPadding` / `dotSize` 可调参数，中尺寸改用紧凑参数，内容完整落在卡片内 |
+| **性能：滚动卡顿治理** | 模型层热点优化 + 视图层去重，详见 5.5 |
+
 ---
 
 ## 四、目录结构
@@ -110,14 +120,18 @@ xcrun simctl launch booted com.ixiaoqiang.calendarapp -largeFontMode YES     # �
 │   │   │   └── HistoryToday.swift       # 历史上的今天数据表
 │   │   ├── Models/                  # SolarDate / DayInfo / MonthGrid / CalendarYear
 │   │   ├── Views/                   # MiniMonthGrid（主 App 与小组件共用）
+│   │   │                            #   WidgetViews（三档 + 锁屏组件视图，主 App 预览也复用）
 │   │   ├── Resources/               # holiday-plans.json（内置节假日基线）
 │   │   └── DesignSystem/            # 配色、卡片样式、字号缩放（Palette / card / scaledFont）
-│   ├── App/                         # 主 App：入口 + 6 个视图
+│   ├── App/                         # 主 App：入口 + 7 个视图
 │   │   └── Views/                   # RootView / MonthGridView / DayDetailView /
-│   │                                #   YearView / HistoryTodayView / SettingsView
-│   └── Widget/                      # WidgetKit 扩展：三档 + 锁屏组件
+│   │                                #   YearView / HistoryTodayView / SettingsView /
+│   │                                #   WidgetPreviewView（App 内组件样式预览）
+│   └── Widget/                      # WidgetKit 扩展：宿主入口 + 时间线
 └── README.md
 ```
+
+> 小组件的**视图实现**（`SmallWidgetView` / `MediumWidgetView` / `LargeWidgetView` / 锁屏组件）放在 `Sources/Shared/Views/WidgetViews.swift`，这样主 App 的「组件样式预览」能直接复用同一份代码，预览与真机表现一致，不会各写一套而走样。
 
 ---
 
@@ -164,6 +178,38 @@ xcrun simctl launch booted com.ixiaoqiang.calendarapp -largeFontMode YES     # �
 - 日期格子提供完整 VoiceOver 朗读（公历 + 星期 + 今天 + 农历 + 节日 + 休/班）；
 - 翻月、回今天等操作带触觉反馈；图标按钮均有 accessibility label；
 - 文字与背景对比度 ≥ 4.5:1（正文）/ ≥ 3:1（大字）。
+
+### 5.5 性能：滑动卡顿的定位与治理（V1.2 重点）
+
+**现象**：P1 版本上下滑动明显不如 V1 跟手。**排查方法**：把模型层单独抽出来编译成命令行基准程序（`swiftc -O` 与 `-Onone` 各测一遍），逐项打点，用数据定位热点，而不是凭感觉猜。
+
+**定位到的两个原因**：
+
+| 层面 | 问题 | 证据 |
+|---|---|---|
+| 模型层 | `LunarCalendar.termDay` 每次调用都要把节气数据从**十六进制字符串现场解码**，含十余次堆分配；每天要调 3 次，一整月就是 120+ 次 | 单日 `lunar(from:)` 从 0.0265ms 降到 0.00013ms |
+| 视图层 | P1 给 42 个日期格子各自加了 `@ScaledMetric`，等于上百个动态属性依赖；行高又是「按内容自适应」，每次布局都要测量 | 单帧布局开销随格子数线性增长 |
+
+**优化动作**：
+
+1. **年定位改二分**：农历转换原本按年线性累减，现改为「前缀和数组 + 二分查找」；
+2. **节气日表预计算**：`termDay` 的解码结果在首次访问时**一次性算好**存成 `termDayTable`，之后是纯数组查表；
+3. **干支表预计算**：60 甲子组合（10 干 × 12 支）预先拼好成 `ganZhiTable`，避免每次调用做字符串拼接；
+4. **字号缩放只算一次**：把「系统动态字体 × 大字体模式」的倍率提到 `RootView` 顶层算**一次**，通过环境注入；42 个格子改成**接收一个 `scale` 参数**，不再各自持有 `@ScaledMetric`；
+5. **格子高度固定**：`.frame(height:)` 用确定值，布局不再逐格测量。
+
+**效果**（同一台机器，Release `-O` / Debug `-Onone`）：
+
+| 指标 | 优化前 | 优化后 | 提升 |
+|---|---|---|---|
+| `LunarCalendar.lunar(from:)` | 0.0265 ms | **0.00013 ms** | ≈ 207× |
+| `MonthGrid.make`（42 天） | 1.14 ms | **0.054 ms** | ≈ 21× |
+| `RootView` 单次 body 的模型开销 | 3.24 ms | **0.16 ms** | ≈ 20× |
+| 同上（Debug `-Onone`） | 7.35 ms | **0.78 ms** | ≈ 9× |
+
+> 参考基准：60fps 的每帧预算是 **16.7ms**。优化前仅模型层就吃掉 Debug 下近一半预算，再加上视图层的反复测量，滑动自然掉帧；优化后模型层开销已降到预算的约 1%。
+
+**正确性验证**：优化前后分别把 1900-01-31 ~ 2100-12-31 全部日期的农历/干支/节气/生肖字段导出（73,385 行），`diff` 结果**完全一致** —— 是等价优化，不是「改对了大部分」。
 
 ---
 
