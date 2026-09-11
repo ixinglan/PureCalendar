@@ -8,7 +8,7 @@
 
 | 月视图与黄历 | 年视图 | 历史上的今天 | 大字体模式 | 设置 | 小组件预览 |
 | ------ | --- | ------ | ----- | -- | ----- |
-|        |     |        |       |    |       |
+| ![](docs/screenshots/01-月视图与黄历.png) | ![](docs/screenshots/02-年视图.png) | ![](docs/screenshots/03-历史上的今天.png) | ![](docs/screenshots/04-大字体模式.png) | ![](docs/screenshots/05-设置.png) | ![](docs/screenshots/06-小组件预览.png) |
 
 ---
 
@@ -154,7 +154,7 @@ xcodebuild test -project CalendarApp.xcodeproj -scheme CalendarApp \
 
 | App Group 已启用 + 失败友好提示 | 远程数据驱动的休/班标记（2027 年由共享容器提供） |
 | ---------------------- | --------------------------- |
-|                        |                             |
+| ![](docs/screenshots/10-AppGroup已启用与友好提示.png) | ![](docs/screenshots/11-远程数据驱动休班标记.png) |
 
 ---
 
@@ -384,7 +384,7 @@ x = (H − 行距总和 − R·e) / (h + R)
 
 | 标准字号：填满画布 | 1.3 上限：自动让位，不溢出 |
 | --------- | --------------- |
-|           |                 |
+| ![](docs/screenshots/08-大组件填满画布.png) | ![](docs/screenshots/09-大组件字号上限1.3不溢出.png) |
 
 ---
 
