@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  小组件扩展的 App Group 声明，必须与主 App 的 CalendarApp.entitlements 完全一致，
+	  否则两个进程会被分配不同的容器，共享数据依然读不到。
+	-->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.ixiaoqiang.calendarapp</string>
+	</array>
+</dict>
+</plist>

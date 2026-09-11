@@ -28,6 +28,8 @@ targets:
       - path: Sources/App
         excludes:
           - "Info.plist"
+          # entitlements 只作为签名配置使用，不要被打进 App 包
+          - "CalendarApp.entitlements"
       - path: Sources/Shared
     settings:
       base:
@@ -35,6 +37,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.ixiaoqiang.calendarapp
         INFOPLIST_FILE: Sources/App/Info.plist
         GENERATE_INFOPLIST_FILE: NO
+        # App Group：主 App 与小组件共享同一容器（见 Sources/App/CalendarApp.entitlements）
+        CODE_SIGN_ENTITLEMENTS: Sources/App/CalendarApp.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         TARGETED_DEVICE_FAMILY: "1"
@@ -52,6 +56,7 @@ targets:
       - path: Sources/Widget
         excludes:
           - "Info.plist"
+          - "CalendarWidget.entitlements"
       - path: Sources/Shared
     settings:
       base:
@@ -59,6 +64,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.ixiaoqiang.calendarapp.widget
         INFOPLIST_FILE: Sources/Widget/Info.plist
         GENERATE_INFOPLIST_FILE: NO
+        # 必须与主 App 使用同一个 group，且两份 entitlements 内容保持一致
+        CODE_SIGN_ENTITLEMENTS: Sources/Widget/CalendarWidget.entitlements
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         TARGETED_DEVICE_FAMILY: "1"
         SKIP_INSTALL: YES

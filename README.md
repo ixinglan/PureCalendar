@@ -68,6 +68,16 @@ xcrun simctl launch booted com.ixiaoqiang.calendarapp -scrollProbe           # �
 xcrun simctl launch booted com.ixiaoqiang.calendarapp -scrollProbeStatic     # 只统计不自动滚动（手动滑时采样）
 ```
 
+组件与节假日更新相关的补充参数：
+
+```bash
+xcrun simctl launch booted com.ixiaoqiang.calendarapp -showWidgetPreview -widgetPreviewFocusLarge   # 预览页直接滚到大尺寸组件
+xcrun simctl launch booted com.ixiaoqiang.calendarapp -showWidgetPreview -widgetTextScale 1.3       # 按 1.3 倍率压测组件是否溢出
+xcrun simctl launch booted com.ixiaoqiang.calendarapp -showSettings -autoCheckHolidayUpdate         # 进设置页后自动点一次「检查更新」
+```
+
+> `-autoCheckHolidayUpdate` 用于核对「数据未发布 / 网络不可用」时的友好提示 —— 模拟器无法脚本化点击，靠它才能截到那张图。
+
 ### 跑测试（滚动性能 + 交互回归）
 
 ```bash
@@ -129,6 +139,21 @@ xcodebuild test -project CalendarApp.xcodeproj -scheme CalendarApp \
 | **预览保真度修复** | 组件样式预览此前会继承 App 的字号倍率（含「大字体模式」1.18×），看到的比真机更大且会随开关变化。现在每张预览卡单独注入组件自己的缩放规则，与真机一致 |
 | **预览压测参数** | 新增 `-widgetPreviewFocusLarge`（直接滚到大尺寸组件）与 `-widgetTextScale <倍率>`（如 `1.3` 压测上限，确认不溢出） |
 
+### 3.5 节假日远程更新落地（V1.5）
+
+| 项 | 说明 |
+|---|---|
+| **接入 App Group** | 主 App 与小组件共用共享容器，主 App 远程更新后小组件也能读到，**不必重新发版**。两个 target 各配一份 entitlements；未配置时自动回退到 App 私有目录，功能降级而非崩溃。详见 5.2 |
+| **预置接口地址** | `Info.plist` 的 `HolidayPlansURL` 已填 `https://blog.zhaojq.top/calendar/holiday-plans.json`（**预留**）。接口尚未开发，当前请求会返回 404 |
+| **失败不再报错** | 拿不到数据时只给一句友好提示（如「服务器上暂时还没有发布安排数据，已继续使用 App 内置数据」），**不暴露错误码与技术细节**。技术细节仍保留在 `HolidayStoreError.errorDescription` 供排查。详见 5.2 与第七节 |
+| **共享状态可见** | 设置页显示「已启用 App Group：桌面小组件可同步这里更新到的安排」，方便在真机上自查 capability 是否配好 |
+| **小组件重新读盘** | 小组件 `getTimeline` 开头调用 `HolidayStore.invalidate()`——`HolidayStore` 有静态缓存且小组件进程常驻，不 invalidate 会出现「文件更新了但组件没变」 |
+| **接口规范入库** | 完整的请求方式、字段定义、示例与容错规则写入 **README 第七节**，服务端按规范开发即可，客户端无需改动 |
+
+| App Group 已启用 + 失败友好提示 | 远程数据驱动的休/班标记（2027 年由共享容器提供） |
+|---|---|
+| ![](docs/screenshots/10-AppGroup已启用与友好提示.png) | ![](docs/screenshots/11-远程数据驱动休班标记.png) |
+
 ---
 
 ## 四、目录结构
@@ -153,11 +178,13 @@ xcodebuild test -project CalendarApp.xcodeproj -scheme CalendarApp \
 │   │   ├── Resources/               # holiday-plans.json（内置节假日基线）
 │   │   └── DesignSystem/            # 配色、卡片样式、字号缩放（Palette / card / scaledFont）
 │   ├── App/                         # 主 App：入口 + 7 个视图 + 诊断工具
+│   │   ├── CalendarApp.entitlements # App Group 声明（主 App 侧）
 │   │   ├── Diagnostics/             # ScrollDiagnostics（仅 Debug：帧率探针 / 自动滚动 / FPS HUD）
 │   │   └── Views/                   # RootView / MonthGridView / DayDetailView /
 │   │                                #   YearView / HistoryTodayView / SettingsView /
 │   │                                #   WidgetPreviewView（App 内组件样式预览）
 │   └── Widget/                      # WidgetKit 扩展：宿主入口 + 时间线
+│       └── CalendarWidget.entitlements  # App Group 声明（小组件侧，group 必须与主 App 一致）
 ├── Tests/UITests/                   # XCUITest：滚动性能指标 + 点击回归
 └── README.md
 ```
@@ -176,7 +203,7 @@ xcodebuild test -project CalendarApp.xcodeproj -scheme CalendarApp \
 - **黄历宜忌**：基于传统 **建除十二神** 体系推导；值日天神、彭祖百忌、喜神/财神/福神方位均按传统历法规则计算。
   > 宜忌数据集中在 `Almanac.swift`，后续可无缝替换为商业黄历数据源。
 
-### 5.2 节假日年度更新机制（P1 重点）
+### 5.2 节假日年度更新机制（P1 重点，V1.5 接入 App Group）
 
 **问题**：放假与调休安排由国务院办公厅**逐年**公布（一般在前一年 11 月前后）。若把它写死在代码里，每年都必须重新发版，否则用户看到的就是过时且**错误**的调休信息。
 
@@ -185,17 +212,44 @@ xcodebuild test -project CalendarApp.xcodeproj -scheme CalendarApp \
 | 级别 | 位置 | 作用 |
 |---|---|---|
 | 1. 内置基线 | `Sources/Shared/Resources/holiday-plans.json` | 随包发布，保证首次启动与离线可用 |
-| 2. 本地缓存 | `Application Support/CalendarApp/HolidayPlans.json` | 上一次远程更新的结果，重启后仍生效 |
+| 2. 本地缓存 | **App Group 共享容器** `HolidayPlans.json` | 上一次远程更新的结果，**主 App 与小组件都能读到** |
 | 3. 远程数据 | `Info.plist` 的 `HolidayPlansURL` 指向的同结构 JSON | 公布次年安排后**无需发版**即可更新 |
 
 - 读取顺序「缓存 > 内置」，同一年份取 `publishedAt` 较新者；
-- 设置页展示「已收录 N 个年度（起–止）」与数据日期，并支持手动「检查更新」/「恢复内置数据」；
+- 设置页展示「已收录 N 个年度（起–止）」、数据日期与 **App Group 启用状态**，支持手动「检查更新」/「恢复内置数据」；
 - **优雅降级**：某年缺数据时返回 `nil`，上层退回「只显示节日性质、不显示调休」，**绝不猜测、绝不使用过时数据**；
 - 数据来源已在 JSON 中逐条标注发文字号（如 `国办发明电〔2025〕7号`），便于溯源与审计。
 
 **当前内置数据**（均为官方原文核对）：**2024 / 2025 / 2026** 三年，含全部「放假」与「调休上班」日期。
 
-> 已知限制：iOS 上 App 与扩展各自拥有独立沙盒，未配置 App Group 时**小组件读不到 App 下载的缓存**，会回退到内置基线。若要两者共享，需为两个 target 配置同一 App Group 并改用共享容器路径（属后续项）。
+#### 为什么缓存必须放在 App Group 共享容器
+
+iOS 上主 App 与小组件扩展**各有一个沙盒**，`Application Support` 互不可见。若缓存写在 App 私有目录里，主 App 远程更新后小组件依旧读不到，桌面组件会一直停留在打包时的内置数据上——次年公布安排后**必须重新发版**才能修正，这恰恰是本机制要消除的痛点。
+
+配置 App Group 后两者共用一个容器，主 App 写、小组件读，一次更新两端生效。落地要点：
+
+| 环节 | 做法 | 关键提示 |
+|---|---|---|
+| 声明能力 | `Sources/App/CalendarApp.entitlements`、`Sources/Widget/CalendarWidget.entitlements` 均声明 `group.com.ixiaoqiang.calendarapp` | 两份必须**完全一致**，且与开发者后台的 group 一致 |
+| 工程配置 | `project.yml` 里两个 target 各设 `CODE_SIGN_ENTITLEMENTS` | entitlements 要从 `sources` 的 `excludes` 排除，避免被打进 App 包 |
+| 取共享路径 | `FileManager.containerURL(forSecurityApplicationGroupIdentifier:)` | **必须处理返回 `nil` 的情况**，回退到 App 私有目录（降级为「仅主 App 可见」而非崩溃） |
+| 通知刷新 | 写入成功后调 `WidgetCenter.shared.reloadAllTimelines()` | 这只是「请求」，WidgetKit 有刷新配额，不保证立即生效 |
+| 让组件重新读盘 | 小组件 `getTimeline` 开头调 `HolidayStore.invalidate()` | **最易漏的一步**：`HolidayStore` 有静态缓存且小组件进程常驻，不 invalidate 就会出现「文件更新了但组件没变」 |
+| 清除缓存 | `clearCache()` 里同样调用 `reloadWidgets()` | 否则组件会继续显示已被删除的旧数据 |
+
+> ⚠️ **真机需要开发者账号配置**：模拟器不校验 entitlements 真实性，因此模拟器跑通**不代表真机可用**。真机安装前需在 Apple 开发者后台为 `com.ixiaoqiang.calendarapp` 与 `com.ixiaoqiang.calendarapp.widget` 两个 Bundle ID 开启 **App Groups** 能力，并把 `group.com.ixiaoqiang.calendarapp` 加进去。Xcode 里对应的「Signing & Capabilities」应显示 App Groups 已启用。
+
+> 🔎 **怎么验证 entitlements 真的生效**（踩过的坑）：iOS 模拟器走的是「simulated entitlements」通路——链接器把 `xxx-Simulated.xcent` 通过 `-sectcreate __TEXT __entitlements` **嵌进可执行文件**，而 `codesign -d --entitlements` 读的是签名，在模拟器上**永远是空的**，用它判断会误判成失败。正确做法是读 Mach-O 段：
+> ```bash
+> BIN="CalendarApp.app/CalendarApp"
+> OFF=$(otool -l "$BIN" | grep -A6 "sectname __entitlements" | awk '/offset/{print $2; exit}')
+> SIZE=$(otool -l "$BIN" | grep -A6 "sectname __entitlements" | awk '/size/{print $2; exit}')
+> dd if="$BIN" bs=1 skip="$OFF" count="$SIZE" 2>/dev/null | plutil -p -
+> ```
+
+#### 远程更新接口规范
+
+**见第七节**（含请求方式、字段定义、完整示例与客户端容错规则）。
 
 ### 5.3 历史上的今天
 
@@ -340,3 +394,129 @@ xcodegen generate --spec project.yml
 ```
 
 （`brew install xcodegen` 即可获得命令；本项目也验证过官方 release 二进制。）
+
+---
+
+## 七、节假日远程更新接口规范（服务端开发用）
+
+> 客户端**已经按本规范实现完毕**，地址也已预置在 `Info.plist` 的 `HolidayPlansURL` 中（当前接口尚未开发，请求会返回 404，界面给出友好提示）。
+> 服务端按本规范发布 JSON 后，用户端「检查更新」立即可用 —— **客户端无需任何改动，也无需重新发版**。
+
+### 7.1 请求
+
+| 项 | 值 |
+|---|---|
+| 方法 | `GET` |
+| 地址 | `https://blog.zhaojq.top/calendar/holiday-plans.json` |
+| 入参 | **无** —— 不需要 query 参数，不需要请求体，不需要鉴权 |
+| 请求头 | 客户端不发送任何自定义头（标准 `URLSession` 默认行为） |
+| 期望响应 | `200 OK` + `Content-Type: application/json; charset=utf-8` |
+
+客户端**不做缓存协商**（不发 `If-None-Match`、不读 `ETag`），每次「检查更新」都是整包 GET。建议 CDN 侧把 TTL 设短一些（如 5 分钟），让发布后能较快生效。
+
+> 说明：客户端会跟随重定向，因此 `302` 到另一个 **JSON** 地址是可用的；但**跳到 HTML 页面会导致解析失败**，请避免。
+
+### 7.2 响应体结构
+
+```json
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-11-12T09:00:00+08:00",
+  "plans": [
+    {
+      "year": 2027,
+      "source": "国办发明电〔2026〕X号",
+      "publishedAt": "2026-11-12",
+      "days": {
+        "1-1": "holiday",
+        "1-2": "holiday",
+        "1-3": "holiday"
+      }
+    }
+  ]
+}
+```
+
+### 7.3 字段定义
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `schemaVersion` | Int | 是 | 当前固定 `1`。**大于 1 会被客户端拒绝加载**（防止新字段被误读）。若将来需要改结构，请升版本号，并同步通知客户端适配 |
+| `updatedAt` | String | 是 | 整包版本。ISO 8601，如 `2026-11-12T09:00:00+08:00`。客户端拿它与本地缓存做**字符串字典序比较**，不比本地新则不覆盖 → ⚠️ **格式与时区偏移必须始终一致**（例如统一用 `+08:00`），否则比较结果会出错 |
+| `plans` | Array | 是 | 年度安排列表。**可以只包含新增 / 变更的年份**：客户端会把它们与内置基线合并，不会丢掉其他年份 |
+| `plans[].year` | Int | 是 | 年份，如 `2027` |
+| `plans[].source` | String | 是 | 数据来源（公文标题或发文字号），仅用于溯源展示，不参与逻辑 |
+| `plans[].publishedAt` | String | 是 | **严格 `yyyy-MM-dd`**。同一年份若客户端已有数据，取 `publishedAt` 较晚的一份 → 同样按字符串比较，格式不可随意变 |
+| `plans[].days` | Object | 是 | 逐日安排，键值规则见 7.4 |
+
+### 7.4 `days` 的写法（最容易出错的地方）
+
+**键**：`"月-日"`，**月与日都不带前导零**。
+
+| ✅ 正确 | ❌ 错误 |
+|---|---|
+| `"1-1"`、`"2-15"`、`"10-1"` | `"01-01"`、`"02-15"`、`"10-01"` |
+
+客户端按 `days["\(month)-\(day)"]` 取值，格式不对会**静默查不到**（表现为该日没有休/班标记，且**不会报错**），排查起来很隐蔽。
+
+**值**：只有两种，别写第三种。
+
+| 值 | 含义 | 界面表现 |
+|---|---|---|
+| `"holiday"` | 放假 | 角标「休」（主色红） |
+| `"workday"` | 调休上班（通常是周末却要上班） | 角标「班」（琥珀橙） |
+
+**普通周末不要写进 `days`**：「周六周日是否休息」由日历规则直接推断，只有被国务院通知**特别点名**（放假或调休上班）的日期才需要写。多写会造成数据冗余，且一旦与推断规则冲突，界面上会出现自相矛盾的标记。
+
+### 7.5 完整示例
+
+以 2027 年元旦 + 春节为例（片段，非真实安排）：
+
+```json
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-11-12T09:00:00+08:00",
+  "plans": [
+    {
+      "year": 2027,
+      "source": "国办发明电〔2026〕X号",
+      "publishedAt": "2026-11-12",
+      "days": {
+        "1-1": "holiday",
+        "1-2": "holiday",
+        "1-3": "holiday",
+        "2-5": "holiday",
+        "2-6": "holiday",
+        "2-7": "holiday",
+        "2-11": "workday",
+        "10-1": "holiday"
+      }
+    }
+  ]
+}
+```
+
+### 7.6 客户端容错与降级规则
+
+| 服务端返回 | 客户端行为 |
+|---|---|
+| `200` + 合法 JSON，`updatedAt` 比本地新 | 写入共享容器 → 提示「已更新：2027 年」→ 刷新桌面小组件 |
+| `200` + 合法 JSON，`updatedAt` 不比本地新 | 不覆盖本地，提示「已是最新数据」 |
+| `404`（数据尚未发布） | 友好提示「服务器上暂时还没有发布安排数据，已继续使用 App 内置数据」，**界面不出现任何错误** |
+| 其他非 2xx（含 `5xx`） | 友好提示「服务器暂时不可用 / 暂时没能获取到最新安排，已继续使用 App 内置数据」 |
+| JSON 解析失败 / 字段缺失 | 同上，视为「暂时拿不到」，**不覆盖**已缓存的数据 |
+| `schemaVersion > 1` | 拒绝加载（避免误读新字段），退回使用既有数据 |
+| 某一年份完全没有数据 | 该年退回「只标节日性质、不显示调休」，**绝不猜测、绝不使用过时数据** |
+| 网络超时 / 无网络 | 友好提示，继续使用内置数据 |
+
+> 一句话原则：**远程更新是锦上添花**。拿不到新数据时 App 必须仍然正确可用，因此所有失败路径都不会弹错误、不会清空已有数据、不会影响月历显示。
+
+### 7.7 服务端发布检查清单
+
+- [ ] 地址可达且返回 `Content-Type: application/json`
+- [ ] `schemaVersion` 为 `1`（若改结构则同步升版本并通知客户端）
+- [ ] `updatedAt` 格式与前一次**完全一致**（含时区偏移），且确实比上一版新
+- [ ] `days` 的键**不带前导零**，值为 `holiday` / `workday` 两者之一
+- [ ] 未把普通周末写进 `days`
+- [ ] `publishedAt` 严格 `yyyy-MM-dd`，且**不低于**同年度已有数据的值
+- [ ] 用真机（或模拟器）点一次设置页「检查更新」，确认提示为「已更新：XXXX 年」

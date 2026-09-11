@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  App Group：让主 App 与小组件扩展共用同一个容器目录。
+	  用途：主 App 远程更新到的节假日安排写入共享容器后，小组件也能读到，
+	        从而不必重新发版即可让桌面组件显示最新调休信息。
+	  注意：App Group 标识符必须以 group. 开头，且两个 target 必须写完全一致。
+	        真机安装需要在 Apple 开发者后台为这两个 Bundle ID 开启 App Groups 能力，
+	        并把该 group 加进去；模拟器不校验配置，因此模拟器能跑通不代表真机可用。
+	-->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.ixiaoqiang.calendarapp</string>
+	</array>
+</dict>
+</plist>

@@ -1,5 +1,11 @@
 import Foundation
 
+// WidgetKit 仅用于「更新成功后通知系统刷新小组件」。
+// 用 canImport 包住，保证在没链接该框架的环境下依然能编译。
+#if canImport(WidgetKit)
+import WidgetKit
+#endif
+
 // MARK: - 数据模型
 
 /// 某一天在国务院年度节假日安排中的状态。
@@ -86,6 +92,32 @@ enum HolidayStoreError: LocalizedError {
             return "写入本地缓存失败：\(msg)"
         }
     }
+
+    /// 面向用户的**友好提示**（不含技术细节与错误码）。
+    ///
+    /// 为什么需要它：远程更新是「锦上添花」的能力——拿不到新数据时，
+    /// App 仍能靠内置基线正确工作。把 `404`、超时这类技术信息甩给用户既看不懂也徒增焦虑，
+    /// 因此界面上只说明「当前仍在用内置数据 → 稍后可再试」，技术细节留给日志。
+    var friendlyMessage: String {
+        switch self {
+        case .notConfigured, .invalidURL:
+            // 属于配置问题（只在开发阶段可能出现），说明现状即可。
+            return "远程更新尚未配置，当前使用 App 内置的放假安排"
+        case .badStatus(404):
+            // 接口已预留但数据尚未发布，是最常见的一种「预期内」情况。
+            return "服务器上暂时还没有发布安排数据，已继续使用 App 内置数据"
+        case .badStatus(let code) where code >= 500:
+            return "服务器暂时不可用，已继续使用 App 内置数据，稍后可再试"
+        case .badStatus:
+            return "暂时没能获取到最新安排，已继续使用 App 内置数据"
+        case .decodeFailed:
+            // 数据格式不符：对用户而言等同于「暂时拿不到」。
+            return "暂时没能获取到最新安排，已继续使用 App 内置数据"
+        case .cacheWriteFailed:
+            // 已经拿到数据但存不下来，属于本地问题，值得如实告知（会造成「每次都要重下」）。
+            return "最新安排已获取，但保存失败，请检查设备存储空间"
+        }
+    }
 }
 
 // MARK: - 年度更新机制
@@ -98,16 +130,33 @@ enum HolidayStoreError: LocalizedError {
 ///
 /// ## 机制（三级数据源，后者覆盖前者）
 /// 1. **内置基线** `holiday-plans.json`（随包发布，保证首启与离线可用）；
-/// 2. **本地缓存** `Application Support/CalendarApp/HolidayPlans.json`（上一次远程更新的结果）；
+/// 2. **本地缓存** `HolidayPlans.json`（上一次远程更新的结果，**存于 App Group 共享容器**）；
 /// 3. **远程数据** 由 `Info.plist` 的 `HolidayPlansURL` 配置，结构同上。
 ///
 /// 读取顺序为「缓存 > 内置」；`refreshFromRemote()` 负责拉取并落盘。
 /// 同一年份若同时存在，取 `publishedAt` 较新者。
 ///
+/// ## 为什么缓存要放在 App Group 共享容器
+/// 主 App 与小组件扩展在 iOS 上**各有一个沙盒**，`Application Support` 互不可见。
+/// 若缓存写在 App 私有目录里，主 App 远程更新后小组件依旧读不到，
+/// 桌面组件就会一直停留在打包时的内置数据上——次年公布放假安排后
+/// **必须重新发版**才能修正，这正是本机制要消除的痛点。
+/// 配置 App Group 后两者共用一个容器，主 App 写、小组件读，一次更新两端生效。
+///
+/// 未配置 App Group 时（`containerURL` 返回 nil）自动回退到 App 私有目录，
+/// 功能降级为「仅主 App 可见」，**不会崩溃、也不会丢数据**。
+///
 /// ## 优雅降级
 /// 任何一年缺失数据时返回 `nil`，由上层退回「仅标注节日性质、不显示调休」的行为，
 /// **绝不猜测、绝不使用过时数据**。
 enum HolidayStore {
+
+    /// App Group 标识符，必须与 `CalendarApp.entitlements` / `CalendarWidget.entitlements`
+    /// 以及开发者后台里配置的 group 完全一致（三者不一致会导致共享容器取不到）。
+    static let appGroupIdentifier = "group.com.ixiaoqiang.calendarapp"
+
+    /// 共享容器内的缓存文件名。
+    private static let cacheFileName = "HolidayPlans.json"
 
     /// 当前 App 支持的 schema 版本。远程数据版本高于它时拒绝加载，避免新字段导致解析歧义。
     static let currentSchemaVersion = 1
@@ -202,14 +251,30 @@ enum HolidayStore {
 
         try writeCache(payload)
         resetResolved()
+        // 数据已落到共享容器，通知系统重建小组件时间线，让它读到新数据。
+        reloadWidgets()
 
         return .updated(years: payload.plans.map(\.year).sorted(), updatedAt: payload.updatedAt)
+    }
+
+    /// 请求系统刷新全部小组件时间线。
+    ///
+    /// 两点说明：
+    /// 1. 这只是一个「请求」——WidgetKit 有自己的刷新预算，系统可能延后执行，
+    ///    因此不能假设调用后小组件会立刻更新；
+    /// 2. 只有在**写入成功后**调用才有意义，失败时保持现状（小组件继续用内置基线）。
+    static func reloadWidgets() {
+        #if canImport(WidgetKit)
+        WidgetCenter.shared.reloadAllTimelines()
+        #endif
     }
 
     /// 清空本地缓存（回到纯内置数据），用于调试与「恢复默认」。
     static func clearCache() {
         if let url = cacheFileURL { try? FileManager.default.removeItem(at: url) }
         resetResolved()
+        // 共享容器里的文件已删除，同样要通知小组件重建时间线，否则它会继续显示旧数据。
+        reloadWidgets()
     }
 
     /// 强制重新读取磁盘数据。
@@ -258,12 +323,32 @@ enum HolidayStore {
             ?? HolidayPayload(schemaVersion: currentSchemaVersion, updatedAt: "", plans: [])
     }
 
-    /// 缓存文件所在目录：`Application Support/CalendarApp/HolidayPlans.json`。
+    /// App Group 共享容器的根目录；未配置或配置无效时为 `nil`。
     ///
-    /// 注意：App 与其扩展（小组件）在 iOS 上各自拥有独立沙盒，除非配置 App Group，
-    /// 否则**小组件读不到 App 写入的缓存**，会回退到内置数据。
-    /// 若需两者共享，请为两个 target 配置同一个 App Group 并改用共享容器路径。
+    /// 返回的是系统分配的真实路径，形如
+    /// `<容器>/Library/Group Containers/group.com.ixiaoqiang.calendarapp`。
+    /// 主 App 与小组件扩展在**同一台设备上拿到的是同一个目录**——这正是共享的前提。
+    static var sharedContainerURL: URL? {
+        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier)
+    }
+
+    /// App Group 是否真正生效（供设置页展示，便于用户在真机上自查配置）。
+    ///
+    /// 注意：**模拟器不校验签名与 entitlements 的真实性**，因此不能仅凭模拟器通过就断定
+    /// 真机可用；真机还需在开发者后台为两个 Bundle ID 开启 App Groups 能力。
+    static var sharedContainerEnabled: Bool { sharedContainerURL != nil }
+
+    /// 缓存文件路径：**优先共享容器，取不到则回退 App 私有目录**。
+    ///
+    /// 回退分支存在的意义：App Group 依赖签名与开发者后台配置，
+    /// 一旦某一环没配好（或用户在 Xcode 里误删了 capability），`containerURL` 会返回 `nil`。
+    /// 此时绝不能崩，也不能让「检查更新」整个失效——退回旧路径，功能降级为「仅主 App 可见」。
     private static var cacheFileURL: URL? {
+        if let shared = sharedContainerURL {
+            return shared.appendingPathComponent(cacheFileName)
+        }
+
+        // 回退：App 私有 Application Support/CalendarApp/（旧行为，小组件读不到）
         let fm = FileManager.default
         guard let base = try? fm.url(for: .applicationSupportDirectory,
                                      in: .userDomainMask,
@@ -271,7 +356,7 @@ enum HolidayStore {
                                      create: true) else { return nil }
         let dir = base.appendingPathComponent("CalendarApp", isDirectory: true)
         try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("HolidayPlans.json")
+        return dir.appendingPathComponent(cacheFileName)
     }
 
     private static func loadCache() -> HolidayPayload? {

@@ -18,6 +18,14 @@ struct CalendarProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<CalendarEntry>) -> Void) {
         let now = Date()
+        // ⚠️ 必须先丢弃进程内的解析缓存，再读数据。
+        //
+        // 原因：`HolidayStore` 用 `resolvedPlans` 静态变量缓存合并结果，而小组件进程是**常驻**的。
+        // 主 App 远程更新后虽然调用了 `reloadAllTimelines()`，但如果这里不 invalidate，
+        // 小组件会直接复用上一步读到的旧结果，表现为「文件更新了但组件没变」。
+        // 代价只是一次文件读取，而这个方法一天只跑一两次，可以忽略。
+        HolidayStore.invalidate()
+
         let entry = makeEntry(now)
         // 下一天 0 点后再刷新
         let nextMidnight = Calendar.current.nextDate(

@@ -48,6 +48,13 @@ struct SettingsView: View {
         .onAppear {
             // 调试用：带 `-showWidgetPreview` 启动时直接展开预览，便于自动化截图。
             if autoShowWidgetPreview { showWidgetPreview = true }
+            #if DEBUG
+            // 调试用：`-autoCheckHolidayUpdate` 进入设置页后自动点一次「检查更新」。
+            // 模拟器无法脚本化点击，靠它才能用截图核对「数据未发布时」的友好提示。
+            if ProcessInfo.processInfo.arguments.contains("-autoCheckHolidayUpdate") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { checkHolidayUpdate() }
+            }
+            #endif
         }
         .sheet(isPresented: $showWidgetPreview) {
             WidgetPreviewView()
@@ -143,6 +150,20 @@ struct SettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            // App Group 共享状态：用户据此判断桌面小组件能否同步到远程更新的安排。
+            HStack(alignment: .top, spacing: 5) {
+                Image(systemName: HolidayStore.sharedContainerEnabled
+                      ? "checkmark.circle.fill" : "exclamationmark.circle")
+                    .scaledFont(11, weight: .semibold)
+                    .foregroundStyle(HolidayStore.sharedContainerEnabled ? Palette.yi : Palette.workday)
+                Text(HolidayStore.sharedContainerEnabled
+                     ? "已启用 App Group：桌面小组件可同步这里更新到的安排"
+                     : "未启用 App Group：桌面小组件只使用内置数据（需配置开发者账号的 App Groups 能力）")
+                    .scaledFont(11, weight: .regular, design: .rounded)
+                    .foregroundStyle(Palette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             if hasCache {
                 Button {
                     HolidayStore.clearCache()
@@ -158,7 +179,7 @@ struct SettingsView: View {
                 .buttonStyle(.plain)
             }
 
-            Text("放假与调休安排由国务院办公厅逐年公布。App 采用「内置基线 + 远程更新」机制：只要配置了远程数据地址，公布次年安排后无需更新 App 即可拿到最新数据；未配置或无该年度数据时，只显示节日性质、不显示调休，避免使用过时信息。")
+            Text("放假与调休安排由国务院办公厅逐年公布。App 采用「内置基线 + 远程更新」机制：数据地址已预置，官方公布次年安排、服务器发布数据后点「检查更新」即可获取，无需重新安装 App。若尚未发布或暂时连不上，会继续使用内置数据并给出提示，不会影响正常使用。")
                 .scaledFont(12, weight: .regular, design: .rounded)
                 .foregroundStyle(Palette.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
@@ -183,7 +204,9 @@ struct SettingsView: View {
         }
         .buttonStyle(.plain)
         .disabled(isUpdating)
-        .accessibilityHint(remoteConfigured ? "从服务器获取最新放假安排" : "尚未配置远程数据地址")
+        .accessibilityHint(remoteConfigured
+                           ? "从服务器获取最新放假安排；若尚未发布会继续使用内置数据"
+                           : "尚未配置远程数据地址")
     }
 
     private func checkHolidayUpdate() {
@@ -198,8 +221,11 @@ struct SettingsView: View {
                 holidayStamp = HolidayStore.dataTimestamp
                 hasCache = HolidayStore.hasCachedData
             } catch {
-                // HolidayStoreError 实现了 LocalizedError，localizedDescription 即为中文说明。
-                holidayStatus = error.localizedDescription
+                // 友好提示，不暴露错误码与技术细节：
+                // 远程更新只是「锦上添花」，拿不到新数据时内置数据仍然正确可用，
+                // 因此这里不把 404 / 超时这类信息甩给用户（技术细节见 HolidayStoreError.errorDescription）。
+                holidayStatus = (error as? HolidayStoreError)?.friendlyMessage
+                    ?? "暂时没能获取到最新安排，已继续使用 App 内置数据"
             }
             isUpdating = false
         }
