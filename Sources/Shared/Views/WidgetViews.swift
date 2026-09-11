@@ -149,65 +149,104 @@ struct MediumWidgetView: View {
 
 // MARK: - 大尺寸
 
+/// 大尺寸（4×4）组件。
+///
+/// 尺寸设计要点：4×4 的画布（约 364×382pt）比中尺寸大得多，
+/// 因此**不能沿用中/小尺寸的字号**，否则内容只占上半屏、看着很空很小。
+/// 这里做两件事：
+/// 1. 整块文字字号上调（标题 20、农历 17、宜忌 14/15）；
+/// 2. 月历交给 `MiniMonthGrid` 的 `fillHeight` **自动撑满剩余高度**——
+///    字号由可用高度反推，所以画布被填满，且系统字体放大时网格会自动缩小让位，
+///    永远不会溢出被裁（小组件不能滚动，溢出即内容丢失）。
 struct LargeWidgetView: View {
     let info: DayInfo
     let grid: MonthGrid
 
+    /// 字号倍率（由小组件顶层注入）。预留高度必须同步放大，否则高度预算会算错。
+    @Environment(\.fontScale) private var fontScale
+
+    /// 顶部标题行预留高度（标题 20pt 的行高）。
+    private let headerHeight: CGFloat = 25
+    /// 底部信息区（农历全称 + 宜忌）预留高度。
+    private let footerHeight: CGFloat = 92
+    /// 主纵向间距。
+    private let vSpacing: CGFloat = 10
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                // grid.title 形如「2026 年 9 月」（纯 String 拼接，无千分位问题）
-                Text(verbatim: grid.title)
-                    .scaledFont(16, weight: .bold, design: .rounded)
-                Spacer()
-                Text(verbatim: "今天 \(info.solar.day) 日 · \(info.lunar.dayChinese)")
-                    .scaledFont(11, weight: .medium, design: .rounded)
-                    .foregroundStyle(Palette.secondaryText)
+        GeometryReader { geo in
+            // 高度预算：总高 − 标题行 − 分隔线 − 底部信息区 − 各段间距（都随倍率放大）。
+            // 刻意「少给一点」给月历：宁可底部留几 pt 空白，也不要内容溢出被裁。
+            let reserved = (headerHeight + footerHeight + 1 + vSpacing * 3) * fontScale
+            let gridHeight = max(60, geo.size.height - reserved)
+
+            VStack(alignment: .leading, spacing: vSpacing * fontScale) {
+                header
+
+                MiniMonthGrid(grid: grid, highlight: info.solar,
+                              numberSize: 16, rowSpacing: 4,
+                              cellPadding: 6, dotSize: 3,
+                              fillHeight: gridHeight)
+
+                Divider().overlay(Palette.separator)
+
+                footer
+
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+    }
+
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline) {
+            // grid.title 形如「2026 年 9 月」（纯 String 拼接，无千分位问题）
+            Text(verbatim: grid.title)
+                .scaledFont(20, weight: .bold, design: .rounded)
+            Spacer()
+            Text(verbatim: "今天 \(info.solar.day) 日 · \(info.lunar.dayChinese)")
+                .scaledFont(13, weight: .medium, design: .rounded)
+                .foregroundStyle(Palette.secondaryText)
+        }
+    }
+
+    private var footer: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text(info.lunar.fullDescription)
+                    .scaledFont(17, weight: .semibold, design: .rounded)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                Spacer(minLength: 4)
+                if let holiday = info.primaryHoliday {
+                    Text(holiday.name)
+                        .scaledFont(14, weight: .semibold, design: .rounded)
+                        .foregroundStyle(holiday.kind == .statutory ? Palette.accent : Palette.secondaryText)
+                }
+                Text("\(info.almanac.zhiXing)日 · \(info.almanac.luckText)")
+                    .scaledFont(14, weight: .medium, design: .rounded)
+                    .foregroundStyle(info.almanac.isAuspiciousDay ? Palette.yi : Palette.secondaryText)
             }
 
-            MiniMonthGrid(grid: grid, highlight: info.solar, numberSize: 12.5, rowSpacing: 4)
-
-            Divider().overlay(Palette.separator)
-
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    Text(info.lunar.fullDescription)
-                        .scaledFont(13, weight: .semibold, design: .rounded)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                    Spacer(minLength: 4)
-                    if let holiday = info.primaryHoliday {
-                        Text(holiday.name)
-                            .scaledFont(11, weight: .semibold, design: .rounded)
-                            .foregroundStyle(holiday.kind == .statutory ? Palette.accent : Palette.secondaryText)
-                    }
-                    Text("\(info.almanac.zhiXing)日 · \(info.almanac.luckText)")
-                        .scaledFont(11, weight: .medium, design: .rounded)
-                        .foregroundStyle(info.almanac.isAuspiciousDay ? Palette.yi : Palette.secondaryText)
-                }
-
-                HStack(alignment: .top, spacing: 10) {
-                    yiJiBlock("宜", info.almanac.yi.prefix(4), Palette.yi)
-                    yiJiBlock("忌", info.almanac.ji.prefix(4), Palette.ji)
-                }
+            HStack(alignment: .top, spacing: 12) {
+                yiJiBlock("宜", info.almanac.yi.prefix(4), Palette.yi)
+                yiJiBlock("忌", info.almanac.ji.prefix(4), Palette.ji)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private func yiJiBlock(_ label: String, _ items: ArraySlice<String>, _ color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 4) {
-                Circle().fill(color).frame(width: 5, height: 5)
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 5) {
+                Circle().fill(color).frame(width: 7, height: 7)
                 Text(label)
-                    .scaledFont(10, weight: .bold, design: .rounded)
+                    .scaledFont(14, weight: .bold, design: .rounded)
                     .foregroundStyle(color)
             }
             Text(items.joined(separator: " · "))
-                .scaledFont(11, weight: .medium, design: .rounded)
+                .scaledFont(15, weight: .medium, design: .rounded)
                 .foregroundStyle(.primary)
                 .lineLimit(2)
-                .minimumScaleFactor(0.7)
+                .minimumScaleFactor(0.75)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

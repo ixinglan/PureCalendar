@@ -148,17 +148,25 @@ struct ProvidesFontScale: ViewModifier {
     @ScaledMetric(relativeTo: .body) private var dynamicTypeScale: CGFloat = 1
     /// App 内附加倍率（「大字体模式」开关）。
     var extra: CGFloat = 1
+    /// 倍率上限。
+    ///
+    /// 小组件的画布尺寸固定且**不能滚动**，倍率过大时内容必然溢出被裁。
+    /// 因此小组件会设一个上限；App 主界面不限（主界面可以滚动）。
+    var maxScale: CGFloat = .greatestFiniteMagnitude
 
     func body(content: Content) -> some View {
-        content.environment(\.fontScale, dynamicTypeScale * extra)
+        content.environment(\.fontScale, min(dynamicTypeScale * extra, maxScale))
     }
 }
 
 extension View {
     /// 在顶层注入字号倍率。**每个视图树只需要调用一次**（App 的主视图、每个小组件各一次）。
     /// 不要重复调用，否则系统动态字体倍率会被叠加多次。
-    func providesFontScale(extra: CGFloat = 1) -> some View {
-        modifier(ProvidesFontScale(extra: extra))
+    ///
+    /// - Parameter maxScale: 倍率上限；小组件等「画布固定、不可滚动」的场景应传入一个有限值。
+    func providesFontScale(extra: CGFloat = 1,
+                           maxScale: CGFloat = .greatestFiniteMagnitude) -> some View {
+        modifier(ProvidesFontScale(extra: extra, maxScale: maxScale))
     }
 }
 

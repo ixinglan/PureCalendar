@@ -45,7 +45,8 @@ struct TodayWidgetEntryView: View {
     var body: some View {
         content
             // 小组件同样需要字号倍率：在组件视图树顶层注入一次即可（勿重复调用）。
-            .providesFontScale()
+            // 上限 1.3：画布尺寸固定且不可滚动，倍率再大就会溢出被裁。
+            .providesFontScale(maxScale: 1.3)
             .widgetURL(URL(string: "dailycalendar://day/\(entry.info.solar.year)-\(entry.info.solar.month)-\(entry.info.solar.day)"))
     }
 

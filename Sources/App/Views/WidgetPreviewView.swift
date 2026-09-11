@@ -46,31 +46,70 @@ struct WidgetPreviewView: View {
     var body: some View {
         ZStack {
             Palette.background.ignoresSafeArea()
-            ScrollView {
-                VStack(spacing: 20) {
-                    header
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: 20) {
+                        header
 
                     if let info {
+                        // 注意：每张卡片都要**单独**注入小组件自己的字号倍率。
+                        // 预览是 App 里的一层视图，默认会继承 App 的字号倍率（含「大字体模式」的
+                        // 附加倍率），而真实小组件并不叠加它——不注入就会看到一个比真机更大、
+                        // 且会随 App 开关变化的假象。
                         previewCard("小尺寸 · 2×2", size: metrics.small) {
-                            SmallWidgetView(info: info)
+                            SmallWidgetView(info: info).emulatingWidgetFontScale(extra: textScale)
                         }
                         previewCard("中尺寸 · 4×2", size: metrics.medium) {
-                            MediumWidgetView(info: info, grid: grid)
+                            MediumWidgetView(info: info, grid: grid).emulatingWidgetFontScale(extra: textScale)
                         }
                         previewCard("大尺寸 · 4×4", size: metrics.large) {
-                            LargeWidgetView(info: info, grid: grid)
+                            LargeWidgetView(info: info, grid: grid).emulatingWidgetFontScale(extra: textScale)
                         }
+                        // 大尺寸组件在手机屏上会被截断，给个 id 方便直接滚过去核对。
+                        .id(Self.largeAnchor)
                     } else {
-                        Text("无法生成今日数据")
-                            .scaledFont(14, design: .rounded)
-                            .foregroundStyle(Palette.secondaryText)
-                    }
+                            Text("无法生成今日数据")
+                                .scaledFont(14, design: .rounded)
+                                .foregroundStyle(Palette.secondaryText)
+                        }
 
-                    note
+                        note
+                    }
+                    .padding(16)
                 }
-                .padding(16)
+                #if DEBUG
+                .onAppear {
+                    // 调试用：`-widgetPreviewFocusLarge` 直接滚到大尺寸组件，便于逐块核对不留死角。
+                    guard ProcessInfo.processInfo.arguments.contains("-widgetPreviewFocusLarge") else { return }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        proxy.scrollTo(Self.largeAnchor, anchor: .top)
+                    }
+                }
+                #endif
             }
         }
+    }
+
+    /// 大尺寸预览卡片的滚动锚点 id。
+    private static let largeAnchor = "widget.preview.large"
+
+    /// 与真实小组件一致的字号倍率上限（见 `TodayWidgetEntryView`）。
+    /// 小组件画布固定且不可滚动，倍率超过这个值内容就会被裁。
+    static let widgetMaxScale: CGFloat = 1.3
+
+    /// 预览时模拟的字号倍率。
+    ///
+    /// 默认 1（等同系统标准字号）。Debug 下可用启动参数压测：
+    /// `-widgetTextScale 1.3` 直接看「系统字体放到最大」时组件会不会溢出。
+    private var textScale: CGFloat {
+        #if DEBUG
+        let args = ProcessInfo.processInfo.arguments
+        if let i = args.firstIndex(of: "-widgetTextScale"), i + 1 < args.count,
+           let value = Double(args[i + 1]) {
+            return CGFloat(value)
+        }
+        #endif
+        return 1
     }
 
     private var header: some View {
@@ -135,5 +174,13 @@ struct WidgetPreviewView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .card()
+    }
+}
+
+private extension View {
+    /// 让预览中的组件使用**与真实小组件完全一致**的字号倍率规则：
+    /// 不叠加 App 内「大字体模式」的附加倍率，并受 `widgetMaxScale` 上限约束。
+    func emulatingWidgetFontScale(extra: CGFloat) -> some View {
+        providesFontScale(extra: extra, maxScale: WidgetPreviewView.widgetMaxScale)
     }
 }
