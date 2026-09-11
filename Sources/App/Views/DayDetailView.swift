@@ -6,14 +6,12 @@ struct FlowLayout: Layout {
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let maxWidth = proposal.width ?? .infinity
-        var rows: [CGFloat] = [0]
         var currentWidth: CGFloat = 0
         var currentHeight: CGFloat = 0
         var rowHeight: CGFloat = 0
         for sub in subviews {
             let size = sub.sizeThatFits(.unspecified)
             if currentWidth + size.width > maxWidth && currentWidth > 0 {
-                rows.append(0)
                 currentHeight += rowHeight + spacing
                 currentWidth = 0
                 rowHeight = 0
@@ -43,10 +41,13 @@ struct FlowLayout: Layout {
     }
 }
 
-/// 当日详情面板：农历黄历、宜忌、冲煞、值日、彭祖百忌。
+/// 当日详情面板：农历黄历、宜忌、冲煞、值日、彭祖百忌、历史上的今天。
 struct DayDetailView: View {
     let info: DayInfo
     var showAlmanac: Bool = true
+
+    /// 该日的史料条目（无收录时为空）。
+    private var historyEvents: [HistoryEvent] { HistoryToday.events(on: info.solar) }
 
     var body: some View {
         VStack(spacing: 14) {
@@ -56,6 +57,9 @@ struct DayDetailView: View {
                 directionsCard
                 dutyCard
             }
+            if !historyEvents.isEmpty {
+                HistoryTodayView(solar: info.solar, events: historyEvents)
+            }
         }
     }
 
@@ -64,21 +68,24 @@ struct DayDetailView: View {
     private var heroCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text("\(info.solar.day)")
-                    .font(.system(size: 46, weight: .bold, design: .rounded))
+                Text(verbatim: "\(info.solar.day)")
+                    .scaledFont(46, weight: .bold, design: .rounded)
                     .foregroundStyle(Palette.accent)
                     .monospacedDigit()
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(info.solar.month) 月")
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    Text(verbatim: "\(info.solar.month) 月")
+                        .scaledFont(15, weight: .semibold, design: .rounded)
                         .foregroundStyle(Palette.secondaryText)
                     Text(info.solar.weekdayChinese)
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .scaledFont(15, weight: .semibold, design: .rounded)
                         .foregroundStyle(.primary)
                 }
                 Spacer()
+                if let badge = info.dayOffBadge {
+                    dayOffChip(badge)
+                }
                 Text(info.constellation)
-                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .scaledFont(12, weight: .medium, design: .rounded)
                     .foregroundStyle(Palette.secondaryText)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 4)
@@ -86,10 +93,10 @@ struct DayDetailView: View {
             }
 
             Text(info.lunar.fullDescription)
-                .font(.system(size: 17, weight: .semibold, design: .rounded))
+                .scaledFont(17, weight: .semibold, design: .rounded)
                 .foregroundStyle(.primary)
 
-            HStack(spacing: 6) {
+            FlowLayout(spacing: 6) {
                 infoChip("\(info.lunar.ganZhiYear)年")
                 infoChip("\(info.lunar.ganZhiMonth)月")
                 infoChip("\(info.lunar.ganZhiDay)日")
@@ -107,11 +114,24 @@ struct DayDetailView: View {
             }
         }
         .card()
+        .accessibilityElement(children: .contain)
+    }
+
+    /// 「休 / 班」角标：放假用主色，调休上班用琥珀橙。
+    private func dayOffChip(_ badge: String) -> some View {
+        let isHoliday = info.dayOff == .holiday
+        let color = isHoliday ? Palette.accent : Palette.workday
+        return Text(badge)
+            .scaledFont(12, weight: .bold, design: .rounded)
+            .foregroundStyle(.white)
+            .frame(width: 22, height: 22)
+            .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(color))
+            .accessibilityLabel(isHoliday ? "放假" : "调休上班")
     }
 
     private func infoChip(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 12, weight: .medium, design: .rounded))
+            .scaledFont(12, weight: .medium, design: .rounded)
             .foregroundStyle(Palette.secondaryText)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
@@ -137,13 +157,13 @@ struct DayDetailView: View {
             HStack(spacing: 6) {
                 Circle().fill(color).frame(width: 8, height: 8)
                 Text(title)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .scaledFont(15, weight: .bold, design: .rounded)
                     .foregroundStyle(color)
             }
             FlowLayout(spacing: 6) {
                 ForEach(items, id: \.self) { item in
                     Text(item)
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .scaledFont(13, weight: .medium, design: .rounded)
                         .foregroundStyle(color)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 5)
@@ -173,15 +193,17 @@ struct DayDetailView: View {
     private func directionItem(_ title: String, _ value: String) -> some View {
         VStack(spacing: 5) {
             Text(title)
-                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .scaledFont(11, weight: .medium, design: .rounded)
                 .foregroundStyle(Palette.secondaryText)
             Text(value)
-                .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                .scaledFont(12.5, weight: .semibold, design: .rounded)
                 .foregroundStyle(.primary)
                 .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .minimumScaleFactor(0.6)
         }
         .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title)，\(value)")
     }
 
     // MARK: - 值日
@@ -193,12 +215,12 @@ struct DayDetailView: View {
                 dutyBadge("\(info.almanac.zhiXing)日", color: Palette.accent)
                 dutyBadge(info.almanac.tianShen, color: Palette.secondaryText)
                 Text(info.almanac.luckText)
-                    .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                    .scaledFont(12.5, weight: .semibold, design: .rounded)
                     .foregroundStyle(info.almanac.isAuspiciousDay ? Palette.yi : Palette.secondaryText)
-                Spacer()
+                Spacer(minLength: 0)
             }
             Text("彭祖百忌：\(info.almanac.pengZu)")
-                .font(.system(size: 12.5, weight: .regular, design: .rounded))
+                .scaledFont(12.5, weight: .regular, design: .rounded)
                 .foregroundStyle(Palette.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -207,7 +229,7 @@ struct DayDetailView: View {
 
     private func dutyBadge(_ text: String, color: Color) -> some View {
         Text(text)
-            .font(.system(size: 13, weight: .semibold, design: .rounded))
+            .scaledFont(13, weight: .semibold, design: .rounded)
             .foregroundStyle(color)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
@@ -216,7 +238,7 @@ struct DayDetailView: View {
 
     private func cardTitle(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 13, weight: .bold, design: .rounded))
+            .scaledFont(13, weight: .bold, design: .rounded)
             .foregroundStyle(Palette.secondaryText)
     }
 }

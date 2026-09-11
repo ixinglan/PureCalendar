@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		07E0CFDF6B0269A39FCE8546 /* MiniMonthGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = E905D5AAC1A94A276F167C7A /* MiniMonthGrid.swift */; };
+		08CE065ECD3CAACCB671CEE2 /* holiday-plans.json in Resources */ = {isa = PBXBuildFile; fileRef = 4B8E3BB2CBAF317F7B6960D5 /* holiday-plans.json */; };
 		0B3F1A627D3264C4A1C72797 /* HolidayProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A51F455D8C1FA8C27DDDD89 /* HolidayProvider.swift */; };
 		2889556DC77277A3B85F2A4F /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96431D6D9EDFA3B8B6E63FA8 /* RootView.swift */; };
 		2D717506D992DF51BADAFB7F /* CalendarWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC5404FFA96B9F2BAB84EFA3 /* CalendarWidgetBundle.swift */; };
@@ -17,20 +19,30 @@
 		398A3ED4440AD7939CC6D7B6 /* SolarDate.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEBD5F731B4BF367A4A600C0 /* SolarDate.swift */; };
 		3BE3EEC733E57AD70E276B63 /* Almanac.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19DB3DDA43CA4D4701380B11 /* Almanac.swift */; };
 		49B8CFC4041C3948E39ECCD5 /* LunarCalendar.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9154405AD6EE3F4365D438D /* LunarCalendar.swift */; };
+		5E3DD553DAEF2B6DD83AF4B6 /* HistoryTodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 343394F54B8CCAF3FFAABE13 /* HistoryTodayView.swift */; };
 		6A76BA32ECFC8D7BA278BFE4 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A658B7D6437A0F65DB55B8BF /* Theme.swift */; };
 		7AF6D1E693AAD7D6841D05CA /* DayDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E536A1A6B4CFE76C4612C35 /* DayDetailView.swift */; };
 		83A875ED6707EDC245308AFB /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A75E81AF5F0D79F4FAC2B842 /* SettingsView.swift */; };
 		88A5E2C3BE7EFFD46CFA1776 /* SolarDate.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEBD5F731B4BF367A4A600C0 /* SolarDate.swift */; };
+		89C42F034CE2ED09C8773A99 /* holiday-plans.json in Resources */ = {isa = PBXBuildFile; fileRef = 4B8E3BB2CBAF317F7B6960D5 /* holiday-plans.json */; };
+		8CAE28F1203103D5F31F3A22 /* YearView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A137C438CC9C053AAB7E6908 /* YearView.swift */; };
+		92CE1297FBE7DA76E774D35D /* HistoryToday.swift in Sources */ = {isa = PBXBuildFile; fileRef = 361A86A619303BFCD9D04A34 /* HistoryToday.swift */; };
 		97AB101B74B12762B5A761EC /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A658B7D6437A0F65DB55B8BF /* Theme.swift */; };
+		9CCE7C0E6F27F5E1651E085A /* HistoryToday.swift in Sources */ = {isa = PBXBuildFile; fileRef = 361A86A619303BFCD9D04A34 /* HistoryToday.swift */; };
 		A36DB226F822E98711594A1E /* TodayCalendarWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01ED01097D87A8A8D0447630 /* TodayCalendarWidget.swift */; };
+		A5F2C4EADE56947969B8B6A4 /* MiniMonthGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = E905D5AAC1A94A276F167C7A /* MiniMonthGrid.swift */; };
 		A7158EF57B0E4B31A1246411 /* LunarCalendar.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9154405AD6EE3F4365D438D /* LunarCalendar.swift */; };
 		ACAEA9AEA0CBAA419E59AF76 /* Almanac.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19DB3DDA43CA4D4701380B11 /* Almanac.swift */; };
+		AE6F41AA1E65FCB0B93F54D9 /* CalendarYear.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DB60FE5473583C42600296E /* CalendarYear.swift */; };
 		B6FD393CADB879E505B3D1C2 /* CalendarMonth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0620ECD3E3650484AC5C66AE /* CalendarMonth.swift */; };
+		BAA20384E022D726608D13C8 /* HolidayPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A7EE69901A72C0408474E75 /* HolidayPlan.swift */; };
 		C03F1633FC10573F86718597 /* WidgetViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DF796AA0E17E273D8B82F27 /* WidgetViews.swift */; };
 		E198DFF8FA1B272C257448E6 /* CalendarMonth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0620ECD3E3650484AC5C66AE /* CalendarMonth.swift */; };
 		E2132F74CA7C73E897DF4769 /* DayInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F5D6E3C61A8B2189073702D /* DayInfo.swift */; };
 		E92A2A9FE2E4896DC70739FA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 56203B18E54F0F0A5E4F11D4 /* Assets.xcassets */; };
+		EA7F7861F52103BEE2B216F5 /* HolidayPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A7EE69901A72C0408474E75 /* HolidayPlan.swift */; };
 		F516E52B5B2C50841DFF3EAD /* LunarData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2230204FA65C7FD9C8F4EB4E /* LunarData.swift */; };
+		F646192509A504BADF6CBBC1 /* CalendarYear.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DB60FE5473583C42600296E /* CalendarYear.swift */; };
 		FA452F5829F92597126477D9 /* MonthGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8276A31CCED589250844EB86 /* MonthGridView.swift */; };
 		FAFEB15F7D5B243760F1B74B /* LunarData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2230204FA65C7FD9C8F4EB4E /* LunarData.swift */; };
 		FC81C93CA0CF6BBA5239AF51 /* DailyCalendarApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5C49FF577C093B5E4B80E4E /* DailyCalendarApp.swift */; };
@@ -66,19 +78,26 @@
 		19DB3DDA43CA4D4701380B11 /* Almanac.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Almanac.swift; sourceTree = "<group>"; };
 		1E536A1A6B4CFE76C4612C35 /* DayDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayDetailView.swift; sourceTree = "<group>"; };
 		2230204FA65C7FD9C8F4EB4E /* LunarData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LunarData.swift; sourceTree = "<group>"; };
-		48688C4457F5BBFE97E216C7 /* CalendarWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CalendarWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		343394F54B8CCAF3FFAABE13 /* HistoryTodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryTodayView.swift; sourceTree = "<group>"; };
+		361A86A619303BFCD9D04A34 /* HistoryToday.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryToday.swift; sourceTree = "<group>"; };
+		48688C4457F5BBFE97E216C7 /* CalendarWidget.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = CalendarWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		4B8E3BB2CBAF317F7B6960D5 /* holiday-plans.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "holiday-plans.json"; sourceTree = "<group>"; };
 		56203B18E54F0F0A5E4F11D4 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		5A51F455D8C1FA8C27DDDD89 /* HolidayProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HolidayProvider.swift; sourceTree = "<group>"; };
+		5A7EE69901A72C0408474E75 /* HolidayPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HolidayPlan.swift; sourceTree = "<group>"; };
 		5DF796AA0E17E273D8B82F27 /* WidgetViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetViews.swift; sourceTree = "<group>"; };
 		68179C6B772FAF6979C3CB4E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		7DB60FE5473583C42600296E /* CalendarYear.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarYear.swift; sourceTree = "<group>"; };
 		7F5D6E3C61A8B2189073702D /* DayInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayInfo.swift; sourceTree = "<group>"; };
 		8276A31CCED589250844EB86 /* MonthGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthGridView.swift; sourceTree = "<group>"; };
 		96431D6D9EDFA3B8B6E63FA8 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
-		9F26929D3FA8206C874AC575 /* CalendarApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CalendarApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		9F26929D3FA8206C874AC575 /* CalendarApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = CalendarApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A137C438CC9C053AAB7E6908 /* YearView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YearView.swift; sourceTree = "<group>"; };
 		A658B7D6437A0F65DB55B8BF /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		A75E81AF5F0D79F4FAC2B842 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A9154405AD6EE3F4365D438D /* LunarCalendar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LunarCalendar.swift; sourceTree = "<group>"; };
 		E5C49FF577C093B5E4B80E4E /* DailyCalendarApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyCalendarApp.swift; sourceTree = "<group>"; };
+		E905D5AAC1A94A276F167C7A /* MiniMonthGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniMonthGrid.swift; sourceTree = "<group>"; };
 		FC5404FFA96B9F2BAB84EFA3 /* CalendarWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarWidgetBundle.swift; sourceTree = "<group>"; };
 		FEBD5F731B4BF367A4A600C0 /* SolarDate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolarDate.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -95,10 +114,20 @@
 			path = Widget;
 			sourceTree = "<group>";
 		};
+		30E6DC13B7912D5E04CF62D9 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				E905D5AAC1A94A276F167C7A /* MiniMonthGrid.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
 		61086C6639F3EE598FCC9099 /* Lunar */ = {
 			isa = PBXGroup;
 			children = (
 				19DB3DDA43CA4D4701380B11 /* Almanac.swift */,
+				361A86A619303BFCD9D04A34 /* HistoryToday.swift */,
+				5A7EE69901A72C0408474E75 /* HolidayPlan.swift */,
 				5A51F455D8C1FA8C27DDDD89 /* HolidayProvider.swift */,
 				A9154405AD6EE3F4365D438D /* LunarCalendar.swift */,
 				2230204FA65C7FD9C8F4EB4E /* LunarData.swift */,
@@ -110,9 +139,11 @@
 			isa = PBXGroup;
 			children = (
 				1E536A1A6B4CFE76C4612C35 /* DayDetailView.swift */,
+				343394F54B8CCAF3FFAABE13 /* HistoryTodayView.swift */,
 				8276A31CCED589250844EB86 /* MonthGridView.swift */,
 				96431D6D9EDFA3B8B6E63FA8 /* RootView.swift */,
 				A75E81AF5F0D79F4FAC2B842 /* SettingsView.swift */,
+				A137C438CC9C053AAB7E6908 /* YearView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -152,10 +183,19 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		B935410A1C5D094A0E01247D /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				4B8E3BB2CBAF317F7B6960D5 /* holiday-plans.json */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
 		C0F43BF58AB2674D697EA9D9 /* Models */ = {
 			isa = PBXGroup;
 			children = (
 				0620ECD3E3650484AC5C66AE /* CalendarMonth.swift */,
+				7DB60FE5473583C42600296E /* CalendarYear.swift */,
 				7F5D6E3C61A8B2189073702D /* DayInfo.swift */,
 				FEBD5F731B4BF367A4A600C0 /* SolarDate.swift */,
 			);
@@ -168,6 +208,8 @@
 				727A57E72F34A8CF4B44B1DA /* DesignSystem */,
 				61086C6639F3EE598FCC9099 /* Lunar */,
 				C0F43BF58AB2674D697EA9D9 /* Models */,
+				B935410A1C5D094A0E01247D /* Resources */,
+				30E6DC13B7912D5E04CF62D9 /* Views */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -230,7 +272,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 2660;
+				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					AC3D239740FDD748EC8440DF = {
 						ProvisioningStyle = Automatic;
@@ -266,6 +308,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				352EFF1391C77A1A6866346C /* Assets.xcassets in Resources */,
+				08CE065ECD3CAACCB671CEE2 /* holiday-plans.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -274,6 +317,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E92A2A9FE2E4896DC70739FA /* Assets.xcassets in Resources */,
+				89C42F034CE2ED09C8773A99 /* holiday-plans.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -286,17 +330,23 @@
 			files = (
 				ACAEA9AEA0CBAA419E59AF76 /* Almanac.swift in Sources */,
 				B6FD393CADB879E505B3D1C2 /* CalendarMonth.swift in Sources */,
+				F646192509A504BADF6CBBC1 /* CalendarYear.swift in Sources */,
 				FC81C93CA0CF6BBA5239AF51 /* DailyCalendarApp.swift in Sources */,
 				7AF6D1E693AAD7D6841D05CA /* DayDetailView.swift in Sources */,
 				38EB5E33640160798816A7EA /* DayInfo.swift in Sources */,
+				92CE1297FBE7DA76E774D35D /* HistoryToday.swift in Sources */,
+				5E3DD553DAEF2B6DD83AF4B6 /* HistoryTodayView.swift in Sources */,
+				BAA20384E022D726608D13C8 /* HolidayPlan.swift in Sources */,
 				0B3F1A627D3264C4A1C72797 /* HolidayProvider.swift in Sources */,
 				49B8CFC4041C3948E39ECCD5 /* LunarCalendar.swift in Sources */,
 				F516E52B5B2C50841DFF3EAD /* LunarData.swift in Sources */,
+				A5F2C4EADE56947969B8B6A4 /* MiniMonthGrid.swift in Sources */,
 				FA452F5829F92597126477D9 /* MonthGridView.swift in Sources */,
 				2889556DC77277A3B85F2A4F /* RootView.swift in Sources */,
 				83A875ED6707EDC245308AFB /* SettingsView.swift in Sources */,
 				88A5E2C3BE7EFFD46CFA1776 /* SolarDate.swift in Sources */,
 				97AB101B74B12762B5A761EC /* Theme.swift in Sources */,
+				8CAE28F1203103D5F31F3A22 /* YearView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -307,10 +357,14 @@
 				3BE3EEC733E57AD70E276B63 /* Almanac.swift in Sources */,
 				E198DFF8FA1B272C257448E6 /* CalendarMonth.swift in Sources */,
 				2D717506D992DF51BADAFB7F /* CalendarWidgetBundle.swift in Sources */,
+				AE6F41AA1E65FCB0B93F54D9 /* CalendarYear.swift in Sources */,
 				E2132F74CA7C73E897DF4769 /* DayInfo.swift in Sources */,
+				9CCE7C0E6F27F5E1651E085A /* HistoryToday.swift in Sources */,
+				EA7F7861F52103BEE2B216F5 /* HolidayPlan.swift in Sources */,
 				356FCFA1849D46F353143682 /* HolidayProvider.swift in Sources */,
 				A7158EF57B0E4B31A1246411 /* LunarCalendar.swift in Sources */,
 				FAFEB15F7D5B243760F1B74B /* LunarData.swift in Sources */,
+				07E0CFDF6B0269A39FCE8546 /* MiniMonthGrid.swift in Sources */,
 				398A3ED4440AD7939CC6D7B6 /* SolarDate.swift in Sources */,
 				6A76BA32ECFC8D7BA278BFE4 /* Theme.swift in Sources */,
 				A36DB226F822E98711594A1E /* TodayCalendarWidget.swift in Sources */,
@@ -383,7 +437,6 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
@@ -452,7 +505,6 @@
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -464,7 +516,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				DEVELOPMENT_TEAM = 3RW8JYPKDG;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Sources/Widget/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -487,7 +538,6 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				DEVELOPMENT_ASSET_PATHS = "";
-				DEVELOPMENT_TEAM = 3RW8JYPKDG;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Sources/App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -509,7 +559,6 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				DEVELOPMENT_ASSET_PATHS = "";
-				DEVELOPMENT_TEAM = 3RW8JYPKDG;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Sources/App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -528,7 +577,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				DEVELOPMENT_TEAM = 3RW8JYPKDG;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Sources/Widget/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

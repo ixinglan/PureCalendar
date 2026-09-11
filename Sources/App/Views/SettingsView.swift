@@ -4,7 +4,17 @@ import SwiftUI
 struct SettingsView: View {
     @AppStorage("showAlmanac") private var showAlmanac = true
     @AppStorage("weekStartsOnMonday") private var weekStartsOnMonday = false
+    @AppStorage("largeFontMode") private var largeFontMode = false
     @Environment(\.dismiss) private var dismiss
+
+    // 节假日数据状态（本地缓存 + 远程更新）
+    @State private var holidaySummary = HolidayStore.summary
+    @State private var holidayStamp = HolidayStore.dataTimestamp
+    @State private var holidayStatus: String?
+    @State private var isUpdating = false
+    @State private var hasCache = HolidayStore.hasCachedData
+
+    private var remoteConfigured: Bool { HolidayStore.remoteURLString != nil }
 
     var body: some View {
         ZStack {
@@ -13,6 +23,8 @@ struct SettingsView: View {
                 VStack(spacing: 16) {
                     header
                     displaySection
+                    accessibilitySection
+                    holidaySection
                     widgetSection
                     aboutSection
                 }
@@ -20,18 +32,19 @@ struct SettingsView: View {
                 .padding(.vertical, 20)
             }
         }
+        .sensoryFeedback(.selection, trigger: largeFontMode)
     }
 
     private var header: some View {
         HStack {
             Text("设置")
-                .font(.system(size: 26, weight: .bold, design: .rounded))
+                .scaledFont(26, weight: .bold, design: .rounded)
             Spacer()
             Button {
                 dismiss()
             } label: {
                 Text("完成")
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .scaledFont(15, weight: .semibold, design: .rounded)
                     .foregroundStyle(Palette.accent)
             }
             .buttonStyle(.plain)
@@ -39,26 +52,23 @@ struct SettingsView: View {
         .padding(.bottom, 2)
     }
 
+    // MARK: - 显示
+
     private var displaySection: some View {
         VStack(alignment: .leading, spacing: 14) {
             sectionTitle("显示")
 
             Toggle(isOn: $showAlmanac) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("显示黄历宜忌")
-                        .font(.system(size: 15, weight: .medium, design: .rounded))
-                    Text("关闭后仅显示公历、农历与节日")
-                        .font(.system(size: 12, design: .rounded))
-                        .foregroundStyle(Palette.secondaryText)
-                }
+                settingLabel(title: "显示黄历宜忌", detail: "关闭后仅显示公历、农历与节日")
             }
             .tint(Palette.accent)
+            .accessibilityHint("开关黄历宜忌面板")
 
             Divider().overlay(Palette.separator)
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("每周起始")
-                    .font(.system(size: 15, weight: .medium, design: .rounded))
+                    .scaledFont(15, weight: .medium, design: .rounded)
                 Picker("每周起始", selection: $weekStartsOnMonday) {
                     Text("周日").tag(false)
                     Text("周一").tag(true)
@@ -69,15 +79,125 @@ struct SettingsView: View {
         .card()
     }
 
+    // MARK: - 无障碍
+
+    private var accessibilitySection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            sectionTitle("无障碍")
+
+            Toggle(isOn: $largeFontMode) {
+                settingLabel(title: "大字体模式", detail: "在系统字体大小基础上再放大 18%")
+            }
+            .tint(Palette.accent)
+            .accessibilityHint("开启后界面文字整体放大，适合视力不佳的用户")
+
+            Text("本 App 的文字同时响应系统「设置 → 显示与亮度 → 文字大小」。若仍偏小，可再开启上方开关叠加放大。")
+                .scaledFont(12, weight: .regular, design: .rounded)
+                .foregroundStyle(Palette.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .card()
+    }
+
+    // MARK: - 节假日数据
+
+    private var holidaySection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            sectionTitle("节假日数据")
+
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(holidaySummary)
+                        .scaledFont(15, weight: .medium, design: .rounded)
+                    Text(holidayStamp.isEmpty ? "内置数据" : "数据日期 \(holidayStamp)")
+                        .scaledFont(12, weight: .regular, design: .rounded)
+                        .foregroundStyle(Palette.secondaryText)
+                }
+                Spacer(minLength: 8)
+                updateButton
+            }
+
+            if let status = holidayStatus {
+                Text(status)
+                    .scaledFont(12, weight: .medium, design: .rounded)
+                    .foregroundStyle(Palette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if hasCache {
+                Button {
+                    HolidayStore.clearCache()
+                    hasCache = HolidayStore.hasCachedData
+                    holidaySummary = HolidayStore.summary
+                    holidayStamp = HolidayStore.dataTimestamp
+                    holidayStatus = "已恢复为 App 内置数据"
+                } label: {
+                    Text("恢复内置数据")
+                        .scaledFont(13, weight: .semibold, design: .rounded)
+                        .foregroundStyle(Palette.accent)
+                }
+                .buttonStyle(.plain)
+            }
+
+            Text("放假与调休安排由国务院办公厅逐年公布。App 采用「内置基线 + 远程更新」机制：只要配置了远程数据地址，公布次年安排后无需更新 App 即可拿到最新数据；未配置或无该年度数据时，只显示节日性质、不显示调休，避免使用过时信息。")
+                .scaledFont(12, weight: .regular, design: .rounded)
+                .foregroundStyle(Palette.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .card()
+    }
+
+    private var updateButton: some View {
+        Button(action: checkHolidayUpdate) {
+            HStack(spacing: 5) {
+                if isUpdating {
+                    ProgressView()
+                        .controlSize(.mini)
+                }
+                Text(isUpdating ? "检查中" : "检查更新")
+                    .scaledFont(13, weight: .semibold, design: .rounded)
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(Capsule().fill(remoteConfigured ? Palette.accent : Palette.secondaryText.opacity(0.5)))
+        }
+        .buttonStyle(.plain)
+        .disabled(isUpdating)
+        .accessibilityHint(remoteConfigured ? "从服务器获取最新放假安排" : "尚未配置远程数据地址")
+    }
+
+    private func checkHolidayUpdate() {
+        guard !isUpdating else { return }
+        isUpdating = true
+        holidayStatus = nil
+        Task { @MainActor in
+            do {
+                let result = try await HolidayStore.refreshFromRemote()
+                holidayStatus = result.message
+                holidaySummary = HolidayStore.summary
+                holidayStamp = HolidayStore.dataTimestamp
+                hasCache = HolidayStore.hasCachedData
+            } catch {
+                // HolidayStoreError 实现了 LocalizedError，localizedDescription 即为中文说明。
+                holidayStatus = error.localizedDescription
+            }
+            isUpdating = false
+        }
+    }
+
+    // MARK: - 小组件
+
     private var widgetSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             sectionTitle("桌面小组件")
             widgetRow(size: "小尺寸", desc: "今日公历 · 农历 · 宜忌摘要", icon: "square")
             widgetRow(size: "中尺寸", desc: "当月月历缩略 + 今日宜忌", icon: "square.grid.2x2")
             widgetRow(size: "大尺寸", desc: "完整月历 + 今日黄历卡片", icon: "square.grid.3x3")
+            widgetRow(size: "锁屏", desc: "矩形 / 行内组件：今日农历与宜忌", icon: "lock.rectangle")
 
             Text("添加方法：长按主屏幕空白处 → 点左上角「+」→ 搜索本 App → 选择尺寸与样式 → 添加。")
-                .font(.system(size: 12, design: .rounded))
+                .scaledFont(12, weight: .regular, design: .rounded)
                 .foregroundStyle(Palette.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -93,29 +213,44 @@ struct SettingsView: View {
                 .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Palette.accentSoft))
             VStack(alignment: .leading, spacing: 2) {
                 Text(size)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .scaledFont(15, weight: .semibold, design: .rounded)
                 Text(desc)
-                    .font(.system(size: 12, design: .rounded))
+                    .scaledFont(12, weight: .regular, design: .rounded)
                     .foregroundStyle(Palette.secondaryText)
             }
-            Spacer()
+            Spacer(minLength: 0)
         }
+        .accessibilityElement(children: .combine)
     }
+
+    // MARK: - 关于
 
     private var aboutSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionTitle("关于数据")
-            Text("农历与二十四节气覆盖 1900–2100 年；黄历宜忌基于传统「建除十二神」体系推算；法定节假日仅标注节日性质，调休安排请以国务院公布为准。")
-                .font(.system(size: 12.5, design: .rounded))
+            Text("• 农历与二十四节气覆盖 1900–2100 年，采用中文农历界通用的查表算法。\n• 黄历宜忌基于传统「建除十二神」体系推算，并给出冲煞、彭祖百忌与吉神方位。\n• 历史上的今天只收录有公开记载的史实，共覆盖 \(HistoryToday.coveredDayCount) 个日期。\n• 法定节假日调休以国务院办公厅公布为准。")
+                .scaledFont(12.5, weight: .regular, design: .rounded)
                 .foregroundStyle(Palette.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .card()
     }
 
+    // MARK: - 组件
+
+    private func settingLabel(title: String, detail: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .scaledFont(15, weight: .medium, design: .rounded)
+            Text(detail)
+                .scaledFont(12, weight: .regular, design: .rounded)
+                .foregroundStyle(Palette.secondaryText)
+        }
+    }
+
     private func sectionTitle(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 13, weight: .bold, design: .rounded))
+            .scaledFont(13, weight: .bold, design: .rounded)
             .foregroundStyle(Palette.secondaryText)
     }
 }

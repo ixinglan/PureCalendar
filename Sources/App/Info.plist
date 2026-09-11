@@ -33,6 +33,8 @@
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
+	<key>HolidayPlansURL</key>
+	<string></string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

@@ -11,42 +11,57 @@ struct DayCell: View {
     var body: some View {
         Button(action: onTap) {
             VStack(spacing: 1) {
-                Text("\(info.solar.day)")
-                    .font(.system(size: 17, weight: numberWeight, design: .rounded))
+                Text(verbatim: "\(info.solar.day)")
+                    .scaledFont(17, weight: numberWeight, design: .rounded)
                     .foregroundStyle(numberColor)
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
 
                 Text(cell.inCurrentMonth ? info.cellSubtitle : " ")
-                    .font(.system(size: 9.5, weight: .medium, design: .rounded))
+                    .scaledFont(9.5, weight: .medium, design: .rounded)
                     .foregroundStyle(subtitleColor)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.65)
+                    .minimumScaleFactor(0.6)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 46)
+            .frame(minHeight: 46)
             .background(background)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .opacity(cell.inCurrentMonth ? 1 : 0.32)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
+
+    // MARK: - 样式
 
     private var numberWeight: Font.Weight {
         if isSelected || info.isToday { return .bold }
         return .medium
     }
 
+    /// 日期数字颜色：今天 / 放假 → 主色；调休上班 → 琥珀橙；其余正常。
+    ///
+    /// 注意：**普通周末不标红**，只有「放假 / 法定节日」才用主色，
+    /// 避免整屏标红失去信息量；调休上班（周末却要上班）单独用橙色提示，最容易被漏看。
     private var numberColor: Color {
         if isSelected { return .white }
-        if info.isStatutoryHoliday { return Palette.accent }
         if info.isToday { return Palette.accent }
+        if info.dayOff == .workday { return Palette.workday }
+        if info.isStatutoryHoliday || info.dayOff == .holiday { return Palette.accent }
         return .primary
     }
 
     private var subtitleColor: Color {
-        if isSelected { return Color.white.opacity(0.85) }
-        if info.cellSubtitleIsAccent { return Palette.accent }
-        return Palette.secondaryText
+        if isSelected { return Color.white.opacity(0.9) }
+        switch info.cellSubtitleTone {
+        case .accent: return Palette.accent
+        case .adjustedWorkday: return Palette.workday
+        case .normal: return Palette.secondaryText
+        }
     }
 
     @ViewBuilder
@@ -65,6 +80,20 @@ struct DayCell: View {
             RoundedRectangle(cornerRadius: 13, style: .continuous)
                 .fill(Color.clear)
         }
+    }
+
+    /// VoiceOver 朗读文案：把格子里「看得到但读不出来」的信息补全。
+    private var accessibilityLabel: String {
+        var parts: [String] = ["\(info.solar.year) 年 \(info.solar.month) 月 \(info.solar.day) 日"]
+        parts.append(info.solar.weekdayChinese)
+        if info.isToday { parts.append("今天") }
+        parts.append("农历\(info.lunar.monthChinese)\(info.lunar.dayChinese)")
+        if let holiday = info.primaryHoliday { parts.append(holiday.name) }
+        if let term = info.lunar.term, info.primaryHoliday?.name != term { parts.append(term) }
+        if let badge = info.dayOffBadge {
+            parts.append(badge == "休" ? "放假" : "调休上班")
+        }
+        return parts.joined(separator: "，")
     }
 }
 
@@ -88,11 +117,12 @@ struct MonthGridView: View {
             HStack(spacing: 4) {
                 ForEach(Array(weekdays.enumerated()), id: \.offset) { index, name in
                     Text(name)
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .scaledFont(12, weight: .semibold, design: .rounded)
                         .foregroundStyle(isWeekendColumn(index) ? Palette.accent.opacity(0.75) : Palette.secondaryText)
                         .frame(maxWidth: .infinity)
                 }
             }
+            .accessibilityHidden(true)
 
             // 日期网格
             LazyVGrid(columns: columns, spacing: 6) {

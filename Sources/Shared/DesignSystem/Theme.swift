@@ -54,6 +54,11 @@ enum Palette {
         light: Color(red: 0.741, green: 0.235, blue: 0.204),
         dark: Color(red: 0.976, green: 0.443, blue: 0.416)
     )
+    /// 调休上班（班）标记色：琥珀橙。
+    static let workday = Color(
+        light: Color(red: 0.839, green: 0.506, blue: 0.125),
+        dark: Color(red: 0.973, green: 0.643, blue: 0.286)
+    )
     /// 次要文字。
     static let secondaryText = Color(
         light: Color(red: 0.42, green: 0.42, blue: 0.45),
@@ -107,7 +112,7 @@ struct TagChip: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 12, weight: .medium, design: .rounded))
+            .scaledFont(12, weight: .medium)
             .foregroundStyle(filled ? Color.white : color)
             .padding(.horizontal, 9)
             .padding(.vertical, 4)
@@ -115,5 +120,50 @@ struct TagChip: View {
                 Capsule(style: .continuous)
                     .fill(filled ? color : color.opacity(0.12))
             )
+    }
+}
+
+// MARK: - 无障碍字体缩放
+
+/// App 内「大字体模式」的附加倍率（1 = 标准）。
+private struct FontScaleKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 1
+}
+
+extension EnvironmentValues {
+    var fontScale: CGFloat {
+        get { self[FontScaleKey.self] }
+        set { self[FontScaleKey.self] = newValue }
+    }
+}
+
+/// 字体修饰器：**同时**响应系统「动态字体（Dynamic Type）」与 App 内「大字体模式」。
+///
+/// 说明：`Font.system(size:)` 写死的字号不会随系统字体大小变化，不符合无障碍要求。
+/// 这里用 `@ScaledMetric` 让字号跟随系统设置缩放，再叠加 App 内的倍率，
+/// 从而在保持视觉设计不变的前提下满足 WCAG 2.1 AA 对可缩放文字的要求。
+struct ScaledFontModifier: ViewModifier {
+    @ScaledMetric private var baseSize: CGFloat
+    private let weight: Font.Weight
+    private let design: Font.Design
+    @Environment(\.fontScale) private var scale
+
+    init(size: CGFloat, weight: Font.Weight, design: Font.Design) {
+        _baseSize = ScaledMetric(wrappedValue: size, relativeTo: .body)
+        self.weight = weight
+        self.design = design
+    }
+
+    func body(content: Content) -> some View {
+        content.font(.system(size: baseSize * scale, weight: weight, design: design))
+    }
+}
+
+extension View {
+    /// 无障碍字体：随系统动态字体缩放，并叠加 App 内「大字体模式」倍率。
+    func scaledFont(_ size: CGFloat,
+                    weight: Font.Weight = .regular,
+                    design: Font.Design = .rounded) -> some View {
+        modifier(ScaledFontModifier(size: size, weight: weight, design: design))
     }
 }

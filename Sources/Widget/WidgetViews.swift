@@ -1,63 +1,7 @@
 import SwiftUI
 
-/// 迷你月历网格（供小组件使用）。
-struct MiniMonthGrid: View {
-    let grid: MonthGrid
-    let highlight: SolarDate
-    var showWeekHeader: Bool = true
-    var numberSize: CGFloat = 11
-    var rowSpacing: CGFloat = 2
-
-    private var rows: [[CalendarCell]] {
-        stride(from: 0, to: grid.cells.count, by: 7).map { Array(grid.cells[$0..<min($0 + 7, grid.cells.count)]) }
-    }
-
-    private let weekdayNames = ["日", "一", "二", "三", "四", "五", "六"]
-
-    var body: some View {
-        VStack(spacing: rowSpacing) {
-            if showWeekHeader {
-                HStack(spacing: 0) {
-                    ForEach(weekdayNames, id: \.self) { name in
-                        Text(name)
-                            .font(.system(size: numberSize * 0.78, weight: .semibold, design: .rounded))
-                            .foregroundStyle(Palette.secondaryText)
-                            .frame(maxWidth: .infinity)
-                    }
-                }
-            }
-            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                HStack(spacing: 0) {
-                    ForEach(row) { cell in
-                        cellView(cell)
-                    }
-                }
-            }
-        }
-    }
-
-    private func cellView(_ cell: CalendarCell) -> some View {
-        let isToday = cell.info.solar == highlight
-        return VStack(spacing: 0) {
-            ZStack {
-                if isToday {
-                    Circle().fill(Palette.accent).frame(width: numberSize + 6, height: numberSize + 6)
-                }
-                Text("\(cell.info.solar.day)")
-                    .font(.system(size: numberSize, weight: isToday ? .bold : .medium, design: .rounded))
-                    .foregroundStyle(isToday ? Color.white : (cell.inCurrentMonth ? Color.primary : Palette.secondaryText.opacity(0.4)))
-                    .monospacedDigit()
-            }
-            .frame(height: numberSize + 7)
-
-            Circle()
-                .fill(cell.info.holidays.isEmpty && cell.info.lunar.term == nil ? Color.clear : Palette.accent)
-                .frame(width: 3, height: 3)
-                .opacity(cell.inCurrentMonth ? 1 : 0)
-        }
-        .frame(maxWidth: .infinity)
-    }
-}
+// 说明：迷你月历网格 `MiniMonthGrid` 已抽取到 `Sources/Shared/Views/MiniMonthGrid.swift`，
+// 以便主 App 的年视图与小组件共用同一份实现。
 
 // MARK: - 小尺寸
 

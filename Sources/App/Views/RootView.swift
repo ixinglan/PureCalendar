@@ -1,23 +1,72 @@
 import SwiftUI
 
-/// 主界面：顶部月份导航 + 月历网格 + 当日详情。
+/// 主界面的浏览模式。
+enum BrowseMode: Equatable {
+    /// 月视图（默认）：月历 + 当日黄历详情。
+    case month
+    /// 年视图：一屏 12 个月。
+    case year
+}
+
+/// 主界面：顶部导航 + 月历/年历 + 当日详情。
 struct RootView: View {
     @AppStorage("showAlmanac") private var showAlmanac = true
     @AppStorage("weekStartsOnMonday") private var weekStartsOnMonday = false
+    @AppStorage("largeFontMode") private var largeFontMode = false
 
     @State private var displayedYear: Int
     @State private var displayedMonth: Int
     @State private var selectedDate: SolarDate
     @State private var showSettings = false
+    @State private var mode: BrowseMode = .month
+    @State private var todayResetToken = 0
 
     private let today = SolarDate.today
 
     init() {
-        let t = SolarDate.today
-        _displayedYear = State(initialValue: t.year)
-        _displayedMonth = State(initialValue: t.month)
-        _selectedDate = State(initialValue: t)
+        // 默认：启动即定位到「今天」（`#if DEBUG` 下允许用启动参数覆盖，便于自动化验证）。
+        #if DEBUG
+        let options = RootView.debugLaunchOptions()
+        #else
+        let options = (date: SolarDate.today, mode: BrowseMode.month, showSettings: false)
+        #endif
+
+        _displayedYear = State(initialValue: options.date.year)
+        _displayedMonth = State(initialValue: options.date.month)
+        _selectedDate = State(initialValue: options.date)
+        _mode = State(initialValue: options.mode)
+        _showSettings = State(initialValue: options.showSettings)
     }
+
+    #if DEBUG
+    /// 解析调试用启动参数（仅 Debug 构建存在）。
+    ///
+    /// 用法示例：
+    /// ```
+    /// xcrun simctl launch booted com.ixiaoqiang.calendarapp -startMode year
+    /// xcrun simctl launch booted com.ixiaoqiang.calendarapp -startDate 2026-10-01
+    /// xcrun simctl launch booted com.ixiaoqiang.calendarapp -showSettings
+    /// ```
+    private static func debugLaunchOptions() -> (date: SolarDate, mode: BrowseMode, showSettings: Bool) {
+        var date = SolarDate.today
+        var mode: BrowseMode = .month
+        var showSettings = false
+
+        let args = ProcessInfo.processInfo.arguments
+        if let i = args.firstIndex(of: "-startMode"), i + 1 < args.count, args[i + 1] == "year" {
+            mode = .year
+        }
+        if let i = args.firstIndex(of: "-startDate"), i + 1 < args.count {
+            let parts = args[i + 1].split(separator: "-").compactMap { Int($0) }
+            if parts.count == 3 {
+                date = SolarDate(year: parts[0], month: parts[1], day: parts[2])
+            }
+        }
+        if args.contains("-showSettings") { showSettings = true }
+
+        return (date, mode, showSettings)
+    }
+    #endif
 
     private var grid: MonthGrid {
         MonthGrid.make(year: displayedYear, month: displayedMonth, weekStartsOnMonday: weekStartsOnMonday)
@@ -25,8 +74,10 @@ struct RootView: View {
 
     private var selectedInfo: DayInfo? { DayInfo.make(solar: selectedDate) }
 
+    /// 「今天」按钮是否应该显示。
     private var isOnToday: Bool {
-        selectedDate == today && displayedYear == today.year && displayedMonth == today.month
+        if mode == .year { return displayedYear == today.year }
+        return selectedDate == today && displayedYear == today.year && displayedMonth == today.month
     }
 
     var body: some View {
@@ -40,18 +91,33 @@ struct RootView: View {
                             .padding(.horizontal, 20)
                             .padding(.top, 8)
 
-                        MonthGridView(grid: grid, selectedDate: $selectedDate, weekStartsOnMonday: weekStartsOnMonday)
-                            .padding(.horizontal, 16)
-                            .gesture(swipeGesture)
-
-                        if let info = selectedInfo {
-                            DayDetailView(info: info, showAlmanac: showAlmanac)
+                        switch mode {
+                        case .month:
+                            MonthGridView(grid: grid, selectedDate: $selectedDate, weekStartsOnMonday: weekStartsOnMonday)
                                 .padding(.horizontal, 16)
-                                .id("detail")
+                                .transition(.opacity)
+
+                            if let info = selectedInfo {
+                                DayDetailView(info: info, showAlmanac: showAlmanac)
+                                    .padding(.horizontal, 16)
+                                    .id("detail")
+                            }
+                        case .year:
+                            YearView(
+                                year: displayedYear,
+                                today: today,
+                                selectedDate: selectedDate,
+                                weekStartsOnMonday: weekStartsOnMonday,
+                                onSelectMonth: openMonth
+                            )
+                            .padding(.horizontal, 16)
+                            .transition(.opacity)
                         }
 
                         Spacer(minLength: 90)
                     }
+                    .contentShape(Rectangle())
+                    .gesture(swipeGesture)
                 }
                 .onChange(of: selectedDate) { _, _ in
                     // 选中相邻月份的日期时，同步显示月份
@@ -72,7 +138,14 @@ struct RootView: View {
                     .transition(.scale.combined(with: .opacity))
             }
         }
+        .environment(\.fontScale, largeFontMode ? 1.18 : 1)
         .animation(.snappy(duration: 0.25), value: isOnToday)
+        .animation(.snappy(duration: 0.28), value: mode)
+        // 触觉反馈（无障碍：为非视觉用户提供操作确认）
+        .sensoryFeedback(.selection, trigger: selectedDate)
+        .sensoryFeedback(.impact(weight: .light), trigger: displayedMonth)
+        .sensoryFeedback(.impact(weight: .light), trigger: displayedYear)
+        .sensoryFeedback(.success, trigger: todayResetToken)
         .sheet(isPresented: $showSettings) {
             SettingsView()
         }
@@ -80,23 +153,78 @@ struct RootView: View {
 
     // MARK: - 顶部导航
 
+    @ViewBuilder
     private var header: some View {
+        switch mode {
+        case .month: monthHeader
+        case .year: yearHeader
+        }
+    }
+
+    private var monthHeader: some View {
         HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 3) {
-                // 用 Text(verbatim:) 渲染，避免 SwiftUI 的 LocalizedStringKey 把年份格式化成「2,026」。
-                // 标题统一取自 MonthGrid.title，保证年份格式只有一处定义。
-                Text(verbatim: grid.title)
-                    .font(.system(size: 27, weight: .bold, design: .rounded))
-                    .foregroundStyle(.primary)
-                Text(subtitleText)
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(Palette.secondaryText)
+            // 点标题展开年视图（与 Apple 日历一致的手势心智）。
+            Button {
+                withAnimation(.snappy(duration: 0.28)) { mode = .year }
+            } label: {
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        // Text(verbatim:) 避免 LocalizedStringKey 把年份格式化成「2,026」。
+                        Text(verbatim: grid.title)
+                            .scaledFont(27, weight: .bold, design: .rounded)
+                            .foregroundStyle(.primary)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Palette.secondaryText)
+                    }
+                    Text(subtitleText)
+                        .scaledFont(13, weight: .medium, design: .rounded)
+                        .foregroundStyle(Palette.secondaryText)
+                }
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(grid.title)，\(subtitleText)")
+            .accessibilityHint("展开年视图")
+
             Spacer()
+
             HStack(spacing: 8) {
-                navButton(systemName: "chevron.left") { step(-1) }
-                navButton(systemName: "chevron.right") { step(1) }
-                navButton(systemName: "gearshape") { showSettings = true }
+                navButton(systemName: "chevron.left", label: "上一月") { step(-1) }
+                navButton(systemName: "chevron.right", label: "下一月") { step(1) }
+                navButton(systemName: "gearshape", label: "设置") { showSettings = true }
+            }
+        }
+    }
+
+    private var yearHeader: some View {
+        HStack(alignment: .center) {
+            Button {
+                withAnimation(.snappy(duration: 0.28)) { mode = .month }
+            } label: {
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        Text(verbatim: "\(displayedYear) 年")
+                            .scaledFont(27, weight: .bold, design: .rounded)
+                            .foregroundStyle(.primary)
+                        Image(systemName: "chevron.up")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Palette.secondaryText)
+                    }
+                    Text(yearSubtitleText)
+                        .scaledFont(13, weight: .medium, design: .rounded)
+                        .foregroundStyle(Palette.secondaryText)
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(displayedYear) 年，\(yearSubtitleText)")
+            .accessibilityHint("返回月视图")
+
+            Spacer()
+
+            HStack(spacing: 8) {
+                navButton(systemName: "chevron.left", label: "上一年") { stepYear(-1) }
+                navButton(systemName: "chevron.right", label: "下一年") { stepYear(1) }
+                navButton(systemName: "gearshape", label: "设置") { showSettings = true }
             }
         }
     }
@@ -106,7 +234,11 @@ struct RootView: View {
         return "\(first.lunar.ganZhiYear)年 · 属\(first.lunar.zodiac)"
     }
 
-    private func navButton(systemName: String, action: @escaping () -> Void) -> some View {
+    private var yearSubtitleText: String {
+        CalendarYear.make(year: displayedYear).ganZhiZodiac ?? ""
+    }
+
+    private func navButton(systemName: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: 14, weight: .semibold))
@@ -115,6 +247,7 @@ struct RootView: View {
                 .background(Circle().fill(Palette.accentSoft))
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(label)
     }
 
     private var todayButton: some View {
@@ -123,7 +256,7 @@ struct RootView: View {
                 Image(systemName: "calendar")
                     .font(.system(size: 13, weight: .semibold))
                 Text("今天")
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .scaledFont(14, weight: .semibold, design: .rounded)
             }
             .foregroundStyle(.white)
             .padding(.horizontal, 16)
@@ -132,11 +265,10 @@ struct RootView: View {
             .shadow(color: Palette.accent.opacity(0.3), radius: 10, x: 0, y: 5)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("回到今天")
     }
 
     // MARK: - 交互
-
-    @State private var todayResetToken = 0
 
     private func step(_ delta: Int) {
         withAnimation(.snappy(duration: 0.28)) {
@@ -149,8 +281,28 @@ struct RootView: View {
         }
     }
 
+    private func stepYear(_ delta: Int) {
+        withAnimation(.snappy(duration: 0.28)) {
+            displayedYear += delta
+        }
+    }
+
+    /// 从年视图进入某个月。
+    private func openMonth(_ month: Int) {
+        withAnimation(.snappy(duration: 0.28)) {
+            displayedMonth = month
+            if displayedYear == today.year && month == today.month {
+                selectedDate = today
+            } else {
+                selectedDate = SolarDate(year: displayedYear, month: month, day: 1)
+            }
+            mode = .month
+        }
+    }
+
     private func goToday() {
         withAnimation(.snappy(duration: 0.28)) {
+            mode = .month
             selectedDate = today
             displayedYear = today.year
             displayedMonth = today.month
@@ -162,10 +314,18 @@ struct RootView: View {
         DragGesture(minimumDistance: 24)
             .onEnded { value in
                 if value.translation.width < -50 {
-                    step(1)
+                    advance(1)
                 } else if value.translation.width > 50 {
-                    step(-1)
+                    advance(-1)
                 }
             }
+    }
+
+    /// 左右滑动：月视图翻月 / 年视图翻年。
+    private func advance(_ delta: Int) {
+        switch mode {
+        case .month: step(delta)
+        case .year: stepYear(delta)
+        }
     }
 }
