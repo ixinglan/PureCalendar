@@ -296,6 +296,14 @@ struct SettingsView: View {
                 .scaledFont(12.5, weight: .regular, design: .rounded)
                 .foregroundStyle(Palette.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
+
+            Divider().overlay(Palette.separator)
+
+            sectionTitle("开源许可")
+            Text("农历与二十四节气数据基于开源项目 solarlunar（MIT License），特此致谢。")
+                .scaledFont(12.5, weight: .regular, design: .rounded)
+                .foregroundStyle(Palette.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .card()
     }
