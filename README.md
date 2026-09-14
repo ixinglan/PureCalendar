@@ -183,13 +183,3 @@ xcodegen generate --spec project.yml
 | 某年完全无数据 | 该年只标节日性质，不显示调休 |
 
 > 一句话原则：远程更新是锦上添花，拿不到新数据时 App 仍正确可用。
-
-### 发布检查清单
-
-- [ ] 地址可达且返回 `Content-Type: application/json`
-- [ ] `schemaVersion` 为 `1`
-- [ ] `updatedAt` 格式与上一版完全一致（含时区偏移），且确实更新
-- [ ] `days` 键不带前导零，值为 `holiday` / `workday` 之一
-- [ ] 未把普通周末写进 `days`
-- [ ] `publishedAt` 严格 `yyyy-MM-dd`
-- [ ] 真机（或模拟器）点一次「检查更新」，确认提示「已更新：XXXX 年」
