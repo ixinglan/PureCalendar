@@ -81,7 +81,7 @@ enum HolidayStoreError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .notConfigured:
-            return "未配置远程更新地址（Info.plist 的 HolidayPlansURL 为空）"
+            return "未配置远程更新地址（AppConfig.holidayPlansURL 为空）"
         case .invalidURL(let raw):
             return "更新地址无效：\(raw)"
         case .badStatus(let code):
@@ -131,7 +131,7 @@ enum HolidayStoreError: LocalizedError {
 /// ## 机制（三级数据源，后者覆盖前者）
 /// 1. **内置基线** `holiday-plans.json`（随包发布，保证首启与离线可用）；
 /// 2. **本地缓存** `HolidayPlans.json`（上一次远程更新的结果，**存于 App Group 共享容器**）；
-/// 3. **远程数据** 由 `Info.plist` 的 `HolidayPlansURL` 配置，结构同上。
+/// 3. **远程数据** 由 `AppConfig.holidayPlansURL` 配置，结构同上。
 ///
 /// 读取顺序为「缓存 > 内置」；`refreshFromRemote()` 负责拉取并落盘。
 /// 同一年份若同时存在，取 `publishedAt` 较新者。
@@ -210,11 +210,9 @@ enum HolidayStore {
     /// 是否存在远程下载的缓存（设置页据此决定是否显示「恢复内置数据」）。
     static var hasCachedData: Bool { loadCache() != nil }
 
-    /// Info.plist 中配置的远程 JSON 地址（为空 / 未配置表示不启用远程更新）。
+    /// 远程 JSON 地址（集中配置于 `AppConfig.holidayPlansURL`，未配置表示不启用远程更新）。
     static var remoteURLString: String? {
-        guard let raw = Bundle.main.object(forInfoDictionaryKey: "HolidayPlansURL") as? String else { return nil }
-        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
+        AppConfig.holidayPlansURL?.absoluteString
     }
 
     // MARK: 远程更新

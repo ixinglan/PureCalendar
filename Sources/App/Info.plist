@@ -35,8 +35,6 @@
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
-	<key>HolidayPlansURL</key>
-	<string>https://blog.zhaojq.top/calendar/holiday-plans.json</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

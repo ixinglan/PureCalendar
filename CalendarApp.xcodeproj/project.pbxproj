@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		07E0CFDF6B0269A39FCE8546 /* MiniMonthGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = E905D5AAC1A94A276F167C7A /* MiniMonthGrid.swift */; };
+		11AACC22DD33EE44AA55BB77 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11AABB22CC33DD44EE55FF66 /* AppConfig.swift */; };
+		22BBCC33EE44FF55AA66DD88 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11AABB22CC33DD44EE55FF66 /* AppConfig.swift */; };
 		08CE065ECD3CAACCB671CEE2 /* holiday-plans.json in Resources */ = {isa = PBXBuildFile; fileRef = 4B8E3BB2CBAF317F7B6960D5 /* holiday-plans.json */; };
 		0AC3DB636810D87D2BA5B9D2 /* WidgetPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF72597BF7121F92A725DB0D /* WidgetPreviewView.swift */; };
 		0B3F1A627D3264C4A1C72797 /* HolidayProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A51F455D8C1FA8C27DDDD89 /* HolidayProvider.swift */; };
@@ -114,6 +116,7 @@
 		E905D5AAC1A94A276F167C7A /* MiniMonthGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniMonthGrid.swift; sourceTree = "<group>"; };
 		EF72597BF7121F92A725DB0D /* WidgetPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetPreviewView.swift; sourceTree = "<group>"; };
 		FC5404FFA96B9F2BAB84EFA3 /* CalendarWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarWidgetBundle.swift; sourceTree = "<group>"; };
+		11AABB22CC33DD44EE55FF66 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
 		FEBD5F731B4BF367A4A600C0 /* SolarDate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolarDate.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -247,6 +250,7 @@
 		F60E5527B51E462C5A8C56E8 /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				11AABB22CC33DD44EE55FF66 /* AppConfig.swift */,
 				727A57E72F34A8CF4B44B1DA /* DesignSystem */,
 				61086C6639F3EE598FCC9099 /* Lunar */,
 				C0F43BF58AB2674D697EA9D9 /* Models */,
@@ -392,6 +396,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				ACAEA9AEA0CBAA419E59AF76 /* Almanac.swift in Sources */,
+				11AACC22DD33EE44AA55BB77 /* AppConfig.swift in Sources */,
 				B6FD393CADB879E505B3D1C2 /* CalendarMonth.swift in Sources */,
 				F646192509A504BADF6CBBC1 /* CalendarYear.swift in Sources */,
 				FC81C93CA0CF6BBA5239AF51 /* DailyCalendarApp.swift in Sources */,
@@ -421,6 +426,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				3BE3EEC733E57AD70E276B63 /* Almanac.swift in Sources */,
+				22BBCC33EE44FF55AA66DD88 /* AppConfig.swift in Sources */,
 				E198DFF8FA1B272C257448E6 /* CalendarMonth.swift in Sources */,
 				2D717506D992DF51BADAFB7F /* CalendarWidgetBundle.swift in Sources */,
 				AE6F41AA1E65FCB0B93F54D9 /* CalendarYear.swift in Sources */,

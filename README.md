@@ -62,7 +62,7 @@ xcrun simctl launch booted com.ixiaoqiang.calendarapp
 
 1. **内置基线**（随包发布，保证首次启动与离线可用）
 2. **本地缓存**（App Group 共享容器，主 App 与小组件都能读）
-3. **远程数据**（`HolidayPlansURL` 指向的同结构 JSON，公布后无需发版即可更新）
+3. **远程数据**（`AppConfig.holidayPlansURL` 指向的同结构 JSON，公布后无需发版即可更新）
 
 缺数据时优雅降级为「只标节日性质、不显示调休」，绝不猜测、绝不用过时数据。远程接口规范见文末第七节。
 
@@ -107,14 +107,14 @@ xcodegen generate --spec project.yml
 
 ## 七、节假日远程更新接口规范（服务端开发用）
 
-> 客户端已按本规范实现完毕，地址预置在 `Info.plist` 的 `HolidayPlansURL`（`https://blog.zhaojq.top/calendar/holiday-plans.json`，当前接口尚未开发，请求返回 404，界面给友好提示）。服务端按此发布 JSON 后，用户端「检查更新」立即可用，客户端无需改动、无需发版。
+> 客户端已按本规范实现完毕，地址集中配置在 `Sources/Shared/AppConfig.swift`（`AppConfig.host` = `pet.zhaojq.top`，接口地址 `https://pet.zhaojq.top/calendar/holiday-plans.json`，当前接口尚未开发，请求返回 404，界面给友好提示）。服务端按此发布 JSON 后，用户端「检查更新」立即可用，客户端无需改动、无需发版。
 
 ### 请求
 
 | 项 | 值 |
 | --- | --- |
 | 方法 | `GET` |
-| 地址 | `https://blog.zhaojq.top/calendar/holiday-plans.json` |
+| 地址 | `https://pet.zhaojq.top/calendar/holiday-plans.json` |
 | 入参 | 无（不需 query、请求体、鉴权） |
 | 期望响应 | `200 OK` + `Content-Type: application/json; charset=utf-8` |
 

@@ -309,7 +309,7 @@ struct SettingsView: View {
 
             // 隐私政策入口：点击后在应用内打开隐私政策网页，无需跳转到系统浏览器。
             // 用系统 Link（iOS 14+）即可，无需引入 SafariServices；会自动呈现为可点击的链接样式。
-            if let url = URL(string: "https://blog.zhaojq.top/calendar/privacy.html") {
+            if let url = AppConfig.privacyURL {
                 Link(destination: url) {
                     HStack(spacing: 6) {
                         Text("隐私政策")
